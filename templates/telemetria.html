@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telemetría — Cohete AESS Unimagdalena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="styles/root.css">
+
+<link rel="icon" href="../img/logo.jpeg">
+
+
+
+
+<style>
+:root{
+  --bg0:#050B14; --bg1:#0A1524; --panel:#0D1B2E; --panel-2:#102138;
+  --line:#1B3350; --teal:#2FE6C8; --teal-dim:#199E8B; --teal-glow:rgba(47,230,200,.14);
+  --amber:#FFB454; --red:#FF6B7A; --blue:#5CA8FF;
+  --text:#DCE9F5; --muted:#7E96AF;
+  --display:'Chakra Petch',sans-serif; --body:'IBM Plex Sans',sans-serif; --mono:'IBM Plex Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg0);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.55}
+::selection{background:var(--teal);color:var(--bg0)}
+
+/* NAV */
+.nav{
+  position:sticky;top:0;z-index:50;height:60px;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:0 clamp(14px,3vw,32px);
+  background:rgba(5,11,20,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
+}
+.nav a.back{font-family:var(--mono);font-size:12.5px;color:var(--muted);text-decoration:none}
+.nav a.back:hover{color:var(--teal)}
+.nav .brand{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:9px;white-space:nowrap}
+.nav .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px var(--teal)}
+.status{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;
+  border:1px solid var(--line);border-radius:999px;padding:5px 13px;color:var(--muted);
+  display:flex;align-items:center;gap:7px;white-space:nowrap;
+}
+.status::before{content:"●";color:var(--muted)}
+.status.rx{color:var(--teal);border-color:var(--teal-dim);background:var(--teal-glow)}
+.status.rx::before{color:var(--teal);animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.2}}
+
+main{max-width:1240px;margin:0 auto;padding:26px clamp(14px,3vw,32px) 70px}
+h1{font-family:var(--display);font-size:clamp(22px,3.4vw,32px);text-transform:uppercase;letter-spacing:.02em}
+.sub{color:var(--muted);font-size:14px;margin-top:4px;margin-bottom:24px}
+
+/* FUENTES DE DATOS */
+.sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:22px}
+.src{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.src .head{display:flex;align-items:center;justify-content:space-between}
+.src h3{font-family:var(--display);font-size:14.5px;letter-spacing:.05em;text-transform:uppercase;display:flex;gap:8px;align-items:center}
+.src p{font-size:12.8px;color:var(--muted)}
+.pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.ok{color:var(--teal);border-color:var(--teal-dim);background:var(--teal-glow)}
+.pill.warn{color:var(--amber);border-color:#7a5a2a}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+.btn{
+  font-family:var(--display);font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:10px 16px;border-radius:8px;border:none;cursor:pointer;transition:.15s;
+  display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+}
+.btn-primary{background:var(--teal);color:var(--bg0)}
+.btn-primary:hover{background:#5cf0d8;transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+.btn-ghost:hover{border-color:var(--teal-dim);color:var(--teal)}
+.btn-danger{background:transparent;border:1px solid #6b2f38;color:var(--red)}
+.btn-danger:hover{background:rgba(255,107,122,.08)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+input[type=file]{display:none}
+.hint{font-family:var(--mono);font-size:10.8px;color:#5d768f}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
+.kpi{
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px 13px;
+  position:relative;overflow:hidden;
+}
+.kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--teal);opacity:.7}
+.kpi .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.kpi .val{font-family:var(--display);font-weight:700;font-size:clamp(22px,2.6vw,30px);margin-top:5px;color:var(--text)}
+.kpi .val small{font-size:.5em;color:var(--muted);font-weight:500;margin-left:4px}
+.kpi.hl .val{color:var(--teal)}
+.kpi.amb::after{background:var(--amber)}
+.kpi.amb .val{color:var(--amber)}
+
+/* GRID CHARTS */
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+@media(max-width:980px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.card h3{font-family:var(--display);font-size:14px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card .note{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px}
+.chart-box{position:relative;height:320px}
+.chart-box.small{height:200px}
+.legend{display:flex;gap:16px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+/* COMPARACIÓN */
+.match{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:13px 16px;margin-top:14px;
+}
+.match .pct{font-family:var(--display);font-weight:700;font-size:26px;color:var(--teal)}
+.match .pct.bad{color:var(--amber)}
+.match p{font-size:12.8px;color:var(--muted);flex:1;min-width:200px}
+.bar{flex-basis:100%;height:6px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal-dim),var(--teal));width:0%;transition:width .6s}
+
+/* GPS + TABLA */
+.gps .coord{font-family:var(--mono);font-size:15px;color:var(--teal);margin:6px 0}
+.gps a{color:var(--blue);font-size:12.5px}
+.tbl-wrap{overflow:auto;max-height:300px;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.8px}
+th,td{padding:8px 11px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel-2);color:var(--teal);font-weight:500;letter-spacing:.06em;font-size:10.5px;text-transform:uppercase}
+td:first-child,th:first-child{text-align:left}
+tbody tr:hover{background:rgba(47,230,200,.05)}
+td .tag{font-size:9.5px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+td .tag.tx{color:var(--teal);border-color:var(--teal-dim)}
+td .tag.sd{color:var(--amber);border-color:#7a5a2a}
+
+.empty{
+  border:1.5px dashed var(--line);border-radius:12px;padding:34px 20px;text-align:center;
+  color:var(--muted);font-family:var(--mono);font-size:12.5px;margin-top:10px;
+}
+.footer{margin-top:44px;text-align:center;font-family:var(--mono);font-size:11.5px;color:#4d6580}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="back" href="../index.html">← Volver al sitio</a>
+  <div class="brand"><span class="dot"></span>Telemetría · AESS Unimagdalena</div>
+  <div class="status" id="linkStatus">SIN ENLACE</div>
+</nav>
+
+<main>
+  <h1>Estación terrena — Dashboard de vuelo</h1>
+  <p class="sub">Recibe la transmisión LoRa en vivo, carga el respaldo de la microSD y compara ambas fuentes para confirmar los datos de la misión.</p>
+
+  <!-- FUENTES -->
+  <div class="sources">
+    <div class="src">
+      <div class="head"><h3>Transmisión en vivo</h3><span class="pill" id="pillTx">INACTIVA</span></div>
+      <p>Conecta el receptor Heltec por USB (Web Serial, 115200 baud). Cada línea recibida debe ser un paquete CSV: <span class="hint">t,alt,temp,pres,ax,ay,az,lat,lon</span></p>
+      <div class="btnrow">
+        <button class="btn btn-primary" id="btnSerial">Conectar receptor</button>
+        <button class="btn btn-danger" id="btnSerialStop" disabled>Desconectar</button>
+      </div>
+      <span class="hint" id="serialHint"></span>
+    </div>
+    <div class="src">
+      <div class="head"><h3>Respaldo microSD</h3><span class="pill" id="pillSd">SIN ARCHIVO</span></div>
+      <p>Carga el archivo <b>.csv</b> o <b>.txt</b> que guardó la aviónica a bordo. Se aceptan encabezados en español o inglés (tiempo/altitud/… o t/alt/…).</p>
+      <div class="btnrow">
+        <label class="btn btn-primary" for="fileSd">Cargar archivo de la SD</label>
+        <input type="file" id="fileSd" accept=".csv,.txt,.log">
+        <button class="btn btn-ghost" id="btnClearSd" disabled>Quitar</button>
+      </div>
+      <span class="hint" id="sdHint"></span>
+    </div>
+    <div class="src">
+      <div class="head"><h3>Modo prueba</h3><span class="pill" id="pillSim">LISTO</span></div>
+      <p>Genera un vuelo simulado (ascenso, apogeo, paracaídas y baliza en tierra) para probar el dashboard sin hardware.</p>
+      <div class="btnrow">
+        <button class="btn btn-ghost" id="btnSim">Simular vuelo</button>
+        <button class="btn btn-ghost" id="btnSimSd">Generar SD de ejemplo</button>
+        <button class="btn btn-danger" id="btnReset">Reiniciar todo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi hl"><div class="lbl">Altitud máxima</div><div class="val" id="kAlt">—<small>m</small></div></div>
+    <div class="kpi hl"><div class="lbl">Velocidad máxima</div><div class="val" id="kVel">—<small>m/s</small></div></div>
+    <div class="kpi hl"><div class="lbl">Tiempo de vuelo</div><div class="val" id="kTime">—<small>s</small></div></div>
+    <div class="kpi"><div class="lbl">Apogeo en</div><div class="val" id="kApo">—<small>s</small></div></div>
+    <div class="kpi"><div class="lbl">Temp. mín / máx</div><div class="val" id="kTemp">—<small>°C</small></div></div>
+    <div class="kpi amb"><div class="lbl">Paquetes recibidos</div><div class="val" id="kPkt">0</div></div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="grid">
+    <div class="card">
+      <h3>Altitud vs tiempo
+        <span class="legend"><span><i style="background:var(--teal)"></i>Transmisión</span><span><i style="background:var(--amber)"></i>microSD</span></span>
+      </h3>
+      <p class="note">Superpone ambas fuentes para confirmar que la transmisión coincide con el respaldo a bordo.</p>
+      <div class="chart-box"><canvas id="chAlt"></canvas></div>
+      <div class="match" id="matchBox" hidden>
+        <span class="pct" id="matchPct">—</span>
+        <p id="matchTxt">Coincidencia entre la altitud transmitida y la altitud registrada en la microSD.</p>
+        <div class="bar"><i id="matchBar"></i></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Velocidad vertical</h3>
+        <p class="note">Derivada de la altitud (suavizada).</p>
+        <div class="chart-box small"><canvas id="chVel"></canvas></div>
+      </div>
+      <div class="card gps">
+        <h3>Posición GPS</h3>
+        <p class="note">Última posición recibida — baliza de recuperación.</p>
+        <div class="coord" id="gpsCoord">— , —</div>
+        <a id="gpsLink" href="#" target="_blank" rel="noopener" hidden>Abrir en Google Maps ↗</a>
+        <p class="note" id="gpsAge" style="margin-top:8px"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="card">
+      <h3>Aceleración (3 ejes)
+        <span class="legend"><span><i style="background:var(--teal)"></i>ax</span><span><i style="background:var(--blue)"></i>ay</span><span><i style="background:var(--red)"></i>az</span></span>
+      </h3>
+      <p class="note">Fuente activa: transmisión si hay enlace; si no, microSD.</p>
+      <div class="chart-box small"><canvas id="chAcc"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Temperatura y presión</h3>
+      <p class="note">Variables atmosféricas de la carga útil.</p>
+      <div class="chart-box small"><canvas id="chAtm"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="card" style="margin-top:14px">
+    <h3>Últimos paquetes</h3>
+    <p class="note">Los 40 paquetes más recientes de cada fuente.</p>
+    <div class="tbl-wrap" id="tblWrap" hidden>
+      <table>
+        <thead><tr><th>Fuente</th><th>T (s)</th><th>Alt (m)</th><th>Temp (°C)</th><th>Pres (hPa)</th><th>ax</th><th>ay</th><th>az</th><th>Lat</th><th>Lon</th></tr></thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="tblEmpty">AÚN NO HAY DATOS — conecta el receptor, carga la microSD o simula un vuelo</div>
+  </div>
+
+  <p class="footer">AESS · UNIMAGDALENA — HidroChallenge Colombia 2026</p>
+</main>
+<script src="../js/telemetria.js"></script>
+</body>
+</html>
