@@ -79,6 +79,9 @@ h1{font-family:var(--display);font-size:clamp(22px,3.4vw,32px);text-transform:up
 .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 input[type=file]{display:none}
 .hint{font-family:var(--mono);font-size:10.8px;color:#5d768f}
+.crono{font-family:var(--display);font-weight:700;font-size:40px;line-height:1.1;color:var(--muted);letter-spacing:.04em}
+.crono.run{color:var(--teal)}
+.crono.stop{color:var(--amber)}
 
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
@@ -133,6 +136,22 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
   border:1.5px dashed var(--line);border-radius:12px;padding:34px 20px;text-align:center;
   color:var(--muted);font-family:var(--mono);font-size:12.5px;margin-top:10px;
 }
+/* PRUEBA DE ENLACE */
+.pill.bad{color:var(--red);border-color:#6b2f38}
+.link-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.link-grid div{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.link-grid .lbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.link-grid b{font-family:var(--display);font-size:22px;font-weight:700}
+.tara-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px}
+.tara-txt{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.tara-txt.ok{color:var(--teal)}
+.tara-txt.warn{color:var(--amber)}
+.tara-txt.bad{color:var(--red)}
+.link-log{
+  margin-top:12px;background:var(--bg1);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);white-space:pre;overflow:auto;max-height:150px;
+}
+
 .footer{margin-top:44px;text-align:center;font-family:var(--mono);font-size:11.5px;color:#4d6580}
 </style>
 </head>
@@ -152,7 +171,7 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
   <div class="sources">
     <div class="src">
       <div class="head"><h3>Transmisión en vivo</h3><span class="pill" id="pillTx">INACTIVA</span></div>
-      <p>Conecta el receptor Heltec por USB (Web Serial, 115200 baud). Cada línea recibida debe ser un paquete CSV: <span class="hint">t,alt,temp,pres,ax,ay,az,lat,lon</span></p>
+      <p>Conecta el receptor Heltec por USB (Web Serial, 115200 baud). Cada línea recibida debe ser un paquete JSON <span class="hint">{"t":…,"alt":…,"temp":…,"pres":…,"ax":…,"ay":…,"az":…}</span> o CSV <span class="hint">t,alt,temp,pres,ax,ay,az,lat,lon</span></p>
       <div class="btnrow">
         <button class="btn btn-primary" id="btnSerial">Conectar receptor</button>
         <button class="btn btn-danger" id="btnSerialStop" disabled>Desconectar</button>
@@ -170,6 +189,15 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
       <span class="hint" id="sdHint"></span>
     </div>
     <div class="src">
+      <div class="head"><h3>Tiempo de vuelo</h3><span class="pill" id="pillVuelo">LISTO</span></div>
+      <div class="crono" id="crono">00:00.0</div>
+      <p>“Iniciar” pone el tiempo en 0 y registra el vuelo desde ese instante (borra la transmisión anterior). “Detener” congela el cronómetro y las gráficas.</p>
+      <div class="btnrow">
+        <button class="btn btn-primary" id="btnVueloIni">Iniciar</button>
+        <button class="btn btn-danger" id="btnVueloFin" disabled>Detener</button>
+      </div>
+    </div>
+    <div class="src">
       <div class="head"><h3>Modo prueba</h3><span class="pill" id="pillSim">LISTO</span></div>
       <p>Genera un vuelo simulado (ascenso, apogeo, paracaídas y baliza en tierra) para probar el dashboard sin hardware.</p>
       <div class="btnrow">
@@ -178,6 +206,31 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
         <button class="btn btn-danger" id="btnReset">Reiniciar todo</button>
       </div>
     </div>
+  </div>
+
+  <!-- PRUEBA DE ENLACE -->
+  <div class="card link" style="margin-bottom:22px">
+    <h3>Prueba de enlace <span class="pill" id="pillLink">SIN DATOS</span></h3>
+    <p class="note" id="linkMsg">Conecta el receptor con “Conectar receptor”. Aquí verás si las dos placas se están comunicando.</p>
+    <div class="link-grid">
+      <div><span class="lbl">Recibidos</span><b id="lkRx">0</b></div>
+      <div><span class="lbl">Perdidos</span><b id="lkLost">—</b></div>
+      <div><span class="lbl">Paquetes/s</span><b id="lkRate">—</b></div>
+      <div><span class="lbl">Último hace</span><b id="lkAge">—</b></div>
+      <div><span class="lbl">RSSI</span><b id="lkRssi">—</b></div>
+      <div><span class="lbl">GPS</span><b id="lkGps" style="font-size:16px">—</b></div>
+      <div><span class="lbl">GY-91</span><b id="lkImu" style="font-size:16px">—</b></div>
+      <div><span class="lbl">Paracaídas</span><b id="lkPara" style="font-size:16px">—</b></div>
+    </div>
+    <div class="tara-row">
+      <button class="btn btn-primary" id="btnTara" disabled>Fijar cero</button>
+      <span class="tara-txt" id="taraTxt">Conecta el receptor para fijar la altitud 0 del cohete.</span>
+    </div>
+    <div class="tara-row">
+      <button class="btn btn-ghost" id="btnServo" disabled>Probar servo</button>
+      <span class="tara-txt" id="servoTxt">Paracaídas: sin datos del cohete.</span>
+    </div>
+    <div class="link-log" id="lkLog">Sin líneas recibidas todavía.</div>
   </div>
 
   <!-- KPIs -->

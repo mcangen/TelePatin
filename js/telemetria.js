@@ -45,7 +45,19 @@ function parseCsvText(text){
   return out;
 }
 
+// paquete JSON del receptor Heltec: {"t":12.35,"alt":10.5,"temp":28,"pres":1009.8,"ax":..,...}
+function parseJsonLine(line){
+  let o; try{ o=JSON.parse(line); }catch(e){ return null; }
+  const g=k=>{ for(const a of ALIAS[k]){ const v=o[a]; if(v!=null && !isNaN(+v)) return +v; } return null; };
+  let t=g('t');
+  if(t==null) return null;
+  if(t>10000) t=t/1000; // millis → segundos
+  return {t, alt:g('alt'), temp:g('temp'), pres:g('pres'),
+          ax:g('ax'), ay:g('ay'), az:g('az'), lat:g('lat'), lon:g('lon')};
+}
+
 function parsePacketLine(line,delim=',',map=null){
+  if(line.startsWith('{')) return parseJsonLine(line);
   const c=line.split(delim).map(s=>parseFloat(s.trim()));
   if(c.length<2 || c.every(isNaN)) return null;
   const pick = k => map ? c[map[k]] : c[ORDER.indexOf(k)];
@@ -166,7 +178,8 @@ function render(){
   const m=flightMetrics(active);
   $('kAlt').innerHTML = (m?fmt(m.altMax):'—')+'<small>m</small>';
   $('kVel').innerHTML = (m&&m.vMax!=null?fmt(m.vMax):'—')+'<small>m/s</small>';
-  $('kTime').innerHTML = (m?fmt(m.flight):'—')+'<small>s</small>';
+  const tv=vueloSegundos(); // cronómetro manual si se usó; si no, detección por altitud
+  $('kTime').innerHTML = (tv!=null?fmt(tv):(m?fmt(m.flight):'—'))+'<small>s</small>';
   $('kApo').innerHTML = (m?fmt(m.apoT):'—')+'<small>s</small>';
   $('kTemp').innerHTML = (m&&m.tempMin!=null?`${fmt(m.tempMin)} / ${fmt(m.tempMax)}`:'—')+'<small>°C</small>';
   $('kPkt').textContent = S.tx.length;
@@ -267,6 +280,7 @@ $('btnSerial').addEventListener('click',async()=>{
     const port=await navigator.serial.requestPort();
     await port.open({baudRate:115200});
     S.serialPort=port;S.serialActive=true;
+    linkReset();
     $('btnSerial').disabled=true;$('btnSerialStop').disabled=false;
     $('pillTx').textContent='RECIBIENDO';$('pillTx').className='pill ok';
     setLink(true,'ENLACE ACTIVO · SERIAL');
@@ -289,8 +303,9 @@ async function readSerial(port){
           const lines=buffer.split(/\r?\n/);
           buffer=lines.pop();
           for(const l of lines){
+            linkTrack(l.trim());
             const p=parsePacketLine(l.trim());
-            if(p){S.tx.push(p);}
+            if(p && vueloPacket(p)){S.tx.push(p);}
           }
           requestRender();
         }
@@ -315,6 +330,221 @@ function stopSerialUi(){
     setLink(false,S.tx.length?'ENLACE CERRADO':'SIN ENLACE');
   }
 }
+
+/* ================= PRUEBA DE ENLACE ================= */
+// Usa el contador "n" de cada paquete para contar pérdidas y la línea
+// "#ENLACE {...}" que imprime el receptor para el RSSI.
+const L = {};
+function linkReset(){
+  Object.assign(L,{rx:0, firstN:null, lastN:null, lastAt:0, times:[], rssi:null, radio:null, log:[], gps:null, sats:null, imu:null, baro:null, para:null, est:null});
+  linkRender();
+}
+linkReset();
+
+function linkTrack(line){
+  if(!line) return;
+  const now=performance.now();
+  L.log.push(line); if(L.log.length>8) L.log.shift();
+
+  if(line.startsWith('#ENLACE')){
+    try{ const o=JSON.parse(line.slice(7)); L.rssi=o.rssi; L.radio=o.radio; }catch(e){}
+    return;
+  }
+  if(!line.startsWith('{')) return;
+  let o; try{ o=JSON.parse(line); }catch(e){ return; }
+  // Estado de la tara: mensaje aparte, no es un paquete de telemetría
+  if(o.tipo==='tara'){ T.est=o; T.estAt=now; return; }
+  if(o.tipo==='servo'){ V.est=o; V.estAt=now; return; }
+
+  L.rx++; L.lastAt=now;
+  if(typeof o.gps==='number') L.gps=o.gps;   // 0 sin datos, 1 sin fix, 2 con fix
+  if(typeof o.sats==='number') L.sats=o.sats;
+  if(typeof o.imu==='number') L.imu=o.imu;    // 1 aceleración real, 0 simulada
+  if(typeof o.baro==='number') L.baro=o.baro; // 1 altitud real, 0 simulada
+  if(typeof o.para==='number') L.para=o.para;
+  if(typeof o.est==='string') L.est=o.est;
+  L.times.push(now); while(L.times.length && now-L.times[0]>5000) L.times.shift();
+  if(typeof o.n==='number'){
+    // Si el contador retrocede, el transmisor se reinició: empezar de nuevo
+    if(L.lastN==null || o.n<L.lastN){ L.firstN=o.n; L.rx=1; }
+    L.lastN=o.n;
+  }
+}
+
+function linkRender(){
+  if(!$('pillLink')) return;
+  const now=performance.now();
+  const age=L.lastAt? (now-L.lastAt)/1000 : null;
+  const rate=L.times.length>1 ? (L.times.length-1)/((L.times[L.times.length-1]-L.times[0])/1000) : null;
+  let lost=null;
+  if(L.firstN!=null){
+    const expected=L.lastN-L.firstN+1;
+    lost=Math.max(0,expected-L.rx);
+    $('lkLost').textContent=`${lost} (${(100*lost/expected).toFixed(1)}%)`;
+  } else $('lkLost').textContent='—';
+
+  $('lkRx').textContent=L.rx;
+  $('lkRate').textContent=rate!=null&&isFinite(rate)?rate.toFixed(1):'—';
+  $('lkAge').textContent=age!=null?age.toFixed(1)+' s':'—';
+  $('lkRssi').textContent=L.rssi!=null?L.rssi+' dBm':'—';
+  const gpsTxt={0:'SIN DATOS',1:`BUSCANDO · ${L.sats??0} sat`,2:`FIX · ${L.sats??0} sat`};
+  $('lkGps').textContent=L.gps!=null?gpsTxt[L.gps]:'—';
+  $('lkGps').style.color=L.gps===2?'var(--teal)':L.gps===1?'var(--amber)':L.gps===0?'var(--red)':'';
+  if(L.para==null){ $('lkPara').textContent='—'; $('lkPara').style.color=''; }
+  else{
+    $('lkPara').textContent=L.para===1?'LIBERADO':`TRABADO · ${L.est??''}`;
+    $('lkPara').style.color=L.para===1?'var(--amber)':'var(--teal)';
+  }
+  if(L.imu==null && L.baro==null){ $('lkImu').textContent='—'; $('lkImu').style.color=''; }
+  else{
+    const ok=n=>n===1?'✓':'✗';
+    $('lkImu').textContent=(L.imu||L.baro)?`MPU ${ok(L.imu)} · BMP ${ok(L.baro)}`:'SIMULADO';
+    $('lkImu').style.color=(L.imu&&L.baro)?'var(--teal)':(L.imu||L.baro)?'var(--amber)':'var(--red)';
+  }
+  $('lkLog').textContent=L.log.length?L.log.join('\n'):'Sin líneas recibidas todavía.';
+
+  const pill=$('pillLink'), msg=$('linkMsg');
+  if(!S.serialActive){
+    pill.textContent='SIN DATOS'; pill.className='pill';
+    msg.textContent='Conecta el receptor con “Conectar receptor”. Aquí verás si las dos placas se están comunicando.';
+  } else if(L.radio===0){
+    pill.textContent='ERROR RADIO'; pill.className='pill bad';
+    msg.textContent='El receptor no pudo iniciar ESP-NOW. Reinícialo.';
+  } else if(!L.lastAt){
+    pill.textContent=L.log.length?'ESPERANDO':'SIN SERIAL'; pill.className='pill warn';
+    msg.textContent=L.log.length
+      ? 'El receptor responde por USB, pero aún no llega nada del transmisor. Revisa que esté encendido y con el mismo canal/modo.'
+      : 'El puerto está abierto pero no llega ninguna línea. ¿Elegiste el puerto correcto y 115200 baud?';
+  } else if(age>2){
+    pill.textContent='SIN SEÑAL'; pill.className='pill bad';
+    msg.textContent=`El transmisor dejó de llegar hace ${age.toFixed(0)} s.`;
+  } else {
+    pill.textContent='ENLACE OK'; pill.className='pill ok';
+    msg.textContent='Las dos placas se están comunicando.'+(lost>0?' Hay algunas pérdidas: revisa distancia y antenas.':'');
+  }
+}
+setInterval(linkRender,500);
+
+/* ================= FIJAR CERO (tara remota) ================= */
+// La página escribe "TARA <id>" al receptor; el cohete responde con
+// {"tipo":"tara","id":..,"res":..,"p0":..,"hace":..} cada segundo.
+const T = {est:null, estAt:0, pendId:null, pendAt:0, aviso:null, avisoAt:0};
+const TARA_TIMEOUT_MS = 6000;
+const TARA_RES = {
+  1:['ok','Cero fijado correctamente.'],
+  2:['bad','Rechazada: el cohete se está moviendo. Déjalo quieto 1 s y repite.'],
+  3:['bad','Rechazada: el cohete no está en ESPERA (en vuelo o ya lanzado).'],
+  4:['bad','Rechazada: el cohete no tiene barómetro funcionando.'],
+};
+
+// Escribe "<NOMBRE> <id>" al receptor, que la reenvía al cohete por ESP-NOW.
+// estado: objeto {pendId,pendAt,aviso,avisoAt} de la orden (T o V).
+async function enviarOrden(nombre, estado){
+  if(!S.serialPort || !S.serialPort.writable) return;
+  const id=(Date.now()%1000000)+1;
+  try{
+    const w=S.serialPort.writable.getWriter();
+    await w.write(new TextEncoder().encode(`${nombre} ${id}\n`));
+    w.releaseLock();
+    estado.pendId=id; estado.pendAt=performance.now(); estado.aviso=null;
+  }catch(err){
+    estado.aviso=['bad','No se pudo enviar la orden: '+err.message]; estado.avisoAt=performance.now();
+  }
+}
+
+// Resuelve una orden pendiente con la respuesta del cohete (o por timeout).
+// Devuelve true mientras siga esperando.
+function ordenPendiente(estado, tabla, now){
+  if(estado.pendId==null) return false;
+  if(estado.est && estado.est.id===estado.pendId){
+    estado.aviso=tabla[estado.est.res]||['warn','Respuesta desconocida del cohete.'];
+    estado.avisoAt=now; estado.pendId=null;
+    return false;
+  }
+  if(now-estado.pendAt>TARA_TIMEOUT_MS){
+    estado.aviso=['bad','Sin confirmación del cohete. ¿Está encendido y con enlace?'];
+    estado.avisoAt=now; estado.pendId=null;
+    return false;
+  }
+  return true;
+}
+
+$('btnTara').addEventListener('click',async()=>{ await enviarOrden('TARA',T); taraRender(); });
+
+function taraRender(){
+  const now=performance.now(), el=$('taraTxt');
+  $('btnTara').disabled=!S.serialActive || T.pendId!=null;
+
+  if(ordenPendiente(T,TARA_RES,now)){
+    el.className='tara-txt warn'; el.textContent='Enviando orden y esperando confirmación del cohete…';
+    return;
+  }
+
+  // Estado actual del cero según el último mensaje del cohete
+  let base='';
+  if(T.est && T.est.hace!=null){
+    const hace=Math.round(T.est.hace+(now-T.estAt)/1000);
+    base=`Cero fijado hace ${hace} s · referencia ${T.est.p0!=null?T.est.p0.toFixed(2)+' hPa':'—'}`;
+  }
+
+  if(T.aviso && now-T.avisoAt<10000){
+    el.className='tara-txt '+T.aviso[0];
+    el.textContent=T.aviso[1]+(base&&T.aviso[0]==='ok'?' '+base:'');
+  } else if(base){
+    el.className='tara-txt'; el.textContent=base;
+  } else {
+    el.className='tara-txt';
+    el.textContent=S.serialActive?'Esperando estado del cero desde el cohete…':'Conecta el receptor para fijar la altitud 0 del cohete.';
+  }
+}
+setInterval(taraRender,500);
+
+/* ================= PARACAÍDAS: PROBAR SERVO E INFORME DEL DISPARO ================= */
+// El cohete envía {"tipo":"servo","id","res","para","prueba","motivo","altDisp","altMax","msLanz","margen"}
+const V = {est:null, estAt:0, pendId:null, pendAt:0, aviso:null, avisoAt:0};
+const SERVO_RES = {
+  1:['ok','Prueba hecha: el servo abrió 2 s y volvió a trabarse.'],
+  3:['bad','Rechazada: solo se prueba en ESPERA (no subiendo, en vuelo ni con el paracaídas liberado).'],
+  5:['warn','Ya hay una prueba de servo en curso.'],
+};
+const MOTIVO_TXT = {APOGEO:'apogeo detectado', BARO:'respaldo barométrico', TIMEOUT:'respaldo por tiempo'};
+
+$('btnServo').addEventListener('click',async()=>{ await enviarOrden('SERVO',V); servoRender(); });
+
+function servoRender(){
+  const now=performance.now(), el=$('servoTxt'), e=V.est;
+  $('btnServo').disabled=!S.serialActive || V.pendId!=null;
+
+  if(ordenPendiente(V,SERVO_RES,now)){
+    el.className='tara-txt warn'; el.textContent='Enviando prueba de servo…';
+    return;
+  }
+
+  let base='', cls='tara-txt';
+  if(e){
+    if(e.para===1){
+      const caida=(e.altMax!=null&&e.altDisp!=null)?(e.altMax-e.altDisp).toFixed(2):'—';
+      const tTxt=e.msLanz!=null?` · ${(e.msLanz/1000).toFixed(2)} s tras el lanzamiento`:'';
+      base=`Paracaídas LIBERADO por ${MOTIVO_TXT[e.motivo]||e.motivo} a ${e.altDisp!=null?e.altDisp.toFixed(2):'—'} m `+
+           `(máx ${e.altMax.toFixed(2)} m, caída ${caida} m, margen ${e.margen} m)${tTxt}`;
+      cls='tara-txt warn';
+    } else if(e.prueba===1){
+      base='Servo ABIERTO (prueba en curso)…'; cls='tara-txt warn';
+    } else {
+      base=`Paracaídas trabado · dispara al bajar ${e.margen} m desde la altitud máxima`;
+    }
+  }
+
+  if(V.aviso && now-V.avisoAt<10000){
+    el.className='tara-txt '+V.aviso[0]; el.textContent=V.aviso[1];
+  } else if(base){
+    el.className=cls; el.textContent=base;
+  } else {
+    el.textContent=S.serialActive?'Esperando estado del paracaídas desde el cohete…':'Paracaídas: sin datos del cohete.';
+    el.className='tara-txt';
+  }
+}
+setInterval(servoRender,500);
 
 /* ================= SIMULACIÓN ================= */
 function simPacket(t){
@@ -380,7 +610,68 @@ $('btnReset').addEventListener('click',()=>{
   $('btnClearSd').disabled=true;
   $('gpsCoord').textContent='— , —';$('gpsLink').hidden=true;$('gpsAge').textContent='';
   setLink(false,'SIN ENLACE');
+  linkReset();
+  vueloReset();
   requestRender();
 });
+
+/* ================= CRONÓMETRO DE VUELO ================= */
+// libre:     comportamiento original (tiempo = reloj del cohete)
+// corriendo: t = 0 en el primer paquete tras "Iniciar"; se registra el vuelo
+// detenido:  el cronómetro y las gráficas quedan congelados
+const F={estado:'libre', t0:null, iniWall:0, dur:0};
+
+// Ajusta el tiempo del paquete; devuelve false si no se debe guardar
+function vueloPacket(p){
+  if(F.estado==='detenido') return false;
+  if(F.estado==='corriendo'){
+    if(F.t0==null) F.t0=p.t;
+    p.t=+(p.t-F.t0).toFixed(2);
+  }
+  return true;
+}
+
+function vueloSegundos(){
+  if(F.estado==='corriendo') return (performance.now()-F.iniWall)/1000;
+  if(F.estado==='detenido') return F.dur;
+  return null;
+}
+
+function fmtCrono(s){
+  const d=Math.floor(s*10), m=Math.floor(d/600), r=(d%600)/10;  // en décimas: evita "00:60.0"
+  return `${String(m).padStart(2,'0')}:${r.toFixed(1).padStart(4,'0')}`;
+}
+
+function vueloRender(){
+  const s=vueloSegundos(), el=$('crono'), pill=$('pillVuelo');
+  el.textContent=fmtCrono(s??0);
+  el.className='crono'+(F.estado==='corriendo'?' run':F.estado==='detenido'?' stop':'');
+  pill.textContent={libre:'LISTO',corriendo:'EN VUELO',detenido:'DETENIDO'}[F.estado];
+  pill.className='pill'+(F.estado==='corriendo'?' ok':F.estado==='detenido'?' warn':'');
+  $('btnVueloIni').textContent=F.estado==='libre'?'Iniciar':'Nuevo vuelo';
+  $('btnVueloIni').disabled=F.estado==='corriendo';
+  $('btnVueloFin').disabled=F.estado!=='corriendo';
+  if(F.estado==='corriendo') $('kTime').innerHTML=fmt(s)+'<small>s</small>';
+}
+
+function vueloReset(){
+  Object.assign(F,{estado:'libre', t0:null, iniWall:0, dur:0});
+  vueloRender();
+}
+
+$('btnVueloIni').addEventListener('click',()=>{
+  S.tx=[];  // Empieza un registro limpio para este vuelo
+  Object.assign(F,{estado:'corriendo', t0:null, iniWall:performance.now(), dur:0});
+  vueloRender(); requestRender();
+});
+
+$('btnVueloFin').addEventListener('click',()=>{
+  F.dur=(performance.now()-F.iniWall)/1000;
+  F.estado='detenido';
+  vueloRender(); requestRender();
+});
+
+setInterval(()=>{ if(F.estado==='corriendo') vueloRender(); },100);
+vueloRender();
 
 requestRender();
