@@ -299,6 +299,77 @@ footer{
 footer .brand{font-family:var(--display);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:14px}
 footer .brand .dot{color:var(--teal)}
 footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+/* ---------- ESQUEMÁTICO ---------- */
+#esquematico{
+  --red:#FF6B7A; --blue:#5CA8FF; --violet:#C792EA; --orange:#FF8A5C;
+  /* Colores de cada red eléctrica */
+  --c-vbat:var(--orange); --c-v5:var(--red); --c-v33:var(--amber); --c-gnd:#8FA6BE;
+  --c-i2c:var(--teal); --c-uart:var(--blue); --c-pwm:var(--violet);
+}
+.esq-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:clamp(16px,3vw,26px)}
+.esq-card h3{font-family:var(--display);font-size:17px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
+.esq-top{display:flex;flex-direction:column;gap:14px;margin-bottom:12px}
+.esq-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.esq-dl{border:none;cursor:pointer;font-size:12.5px;padding:10px 18px}
+.esq-dl.btn-ghost{border:1px solid var(--line)}
+.esq-dl:disabled{opacity:.5;cursor:wait;transform:none}
+.esq-dl-msg{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.esq-legend{display:flex;flex-wrap:wrap;gap:8px}
+.esq-legend button{
+  display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--text);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;transition:.15s;
+}
+.esq-legend button:hover,.esq-legend button.on{border-color:var(--teal-dim);background:var(--teal-glow)}
+.esq-legend i{display:inline-block;width:18px;height:3px;border-radius:2px}
+.esq-hint{font-family:var(--mono);font-size:11px;color:#5d768f;margin-bottom:12px}
+.esq-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:var(--bg1)}
+
+#sch{display:block;width:100%;min-width:960px;height:auto}
+#sch text{font-family:var(--mono)}
+#sch .box{fill:var(--panel);stroke:#24456b;stroke-width:1.5}
+#sch .box.main{fill:#0f2036;stroke:var(--teal-dim);stroke-width:2}
+#sch .ttl{font-family:var(--display);font-weight:700;font-size:15px;fill:var(--teal);letter-spacing:.06em}
+#sch .ttl.big{font-size:21px}
+#sch .st{font-size:10.5px;fill:var(--muted)}
+#sch .pin{font-size:11px;fill:var(--text)}
+#sch .pin.mute{fill:var(--muted)}
+#sch .lbl{font-size:10.5px;font-weight:600;paint-order:stroke;stroke:var(--bg1);stroke-width:4px;stroke-linejoin:round}
+#sch .w{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transition:opacity .15s}
+#sch .dot{transition:opacity .15s}
+#sch [data-net="vbat"].w{stroke:var(--c-vbat)} #sch [data-net="vbat"].dot{fill:var(--c-vbat)}
+#sch [data-net="v5"].w{stroke:var(--c-v5)}     #sch [data-net="v5"].dot{fill:var(--c-v5)}
+#sch [data-net="v33"].w{stroke:var(--c-v33)}   #sch [data-net="v33"].dot{fill:var(--c-v33)}
+#sch [data-net="gnd"].w{stroke:var(--c-gnd)}   #sch [data-net="gnd"].dot{fill:var(--c-gnd)}
+#sch [data-net="i2c"].w{stroke:var(--c-i2c)}   #sch [data-net="i2c"].dot{fill:var(--c-i2c)}
+#sch [data-net="uart"].w{stroke:var(--c-uart)} #sch [data-net="uart"].dot{fill:var(--c-uart)}
+#sch [data-net="pwm"].w{stroke:var(--c-pwm)}   #sch [data-net="pwm"].dot{fill:var(--c-pwm)}
+#sch .pinmark{fill:var(--bg1);stroke:#3b6390;stroke-width:1.2}
+/* Resaltado de una red: atenúa todo lo demás */
+#sch[data-focus] [data-net]{opacity:.13}
+#sch[data-focus="vbat"] [data-net="vbat"],#sch[data-focus="v5"] [data-net="v5"],
+#sch[data-focus="v33"] [data-net="v33"],#sch[data-focus="gnd"] [data-net="gnd"],
+#sch[data-focus="i2c"] [data-net="i2c"],#sch[data-focus="uart"] [data-net="uart"],
+#sch[data-focus="pwm"] [data-net="pwm"]{opacity:1}
+#sch[data-focus] .w{stroke-width:3.2}
+
+.esq-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;margin-top:18px}
+@media(max-width:920px){.esq-grid{grid-template-columns:1fr}}
+.esq-tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+.esq-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.esq-table th,.esq-table td{padding:8px 11px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+.esq-table td:nth-child(n+3){white-space:normal}  /* "Va a" y "Función" pueden partirse en varias líneas */
+.esq-table th{background:var(--panel-2);color:var(--teal);font-weight:500;letter-spacing:.06em;font-size:10.5px;text-transform:uppercase}
+.esq-table tbody tr:hover{background:rgba(47,230,200,.05)}
+.esq-table .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.esq-notes{list-style:none;display:flex;flex-direction:column;gap:10px}
+.esq-notes li{font-size:13.5px;line-height:1.55;padding:10px 12px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--teal-dim)}
+.esq-notes li.warn{border-left-color:var(--amber)}
+.esq-notes li.bad{border-left-color:var(--red)}
+.esq-notes b{color:var(--teal);font-weight:600}
+.esq-notes li.warn b{color:var(--amber)}
+.esq-notes li.bad b{color:var(--red)}
 </style>
 </head>
 <body>
@@ -313,6 +384,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
     <li><a href="#equipo">Equipo</a></li>
     <li><a href="#diseno">Diseño</a></li>
     <li><a href="#telemetria">Telemetría</a></li>
+    <li><a href="#esquematico">Esquemático</a></li>
     <li><a href="#componentes">Componentes</a></li>
     <li><a class="cta" href="templates/telemetria.html">Dashboard en vivo ↗</a></li>
   </ul>
@@ -532,21 +604,286 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
             <a class="btn btn-primary" href="templates/telemetria.html">Abrir dashboard de telemetría ↗</a>
           </div>
         </div>
-        <div class="ph" style="margin-top:18px;min-height:150px">
-          <span class="big">🔌</span>
-          <span>[ PLACEHOLDER · DIAGRAMA DE LA ELECTRÓNICA Y DE LA TELEMETRÍA ]</span>
-          <em>Reemplaza este bloque por los diagramas de conexiones</em>
+        <div class="tele-cta">
+          <a class="btn btn-ghost" href="#esquematico">Ver esquemático eléctrico ↓</a>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- COMPONENTES -->
-<section id="componentes" class="section-alt">
+<!-- ESQUEMÁTICO -->
+<section id="esquematico" class="section-alt">
   <div class="wrap">
     <div class="reveal">
-      <p class="eyebrow">05 · Componentes</p>
+      <p class="eyebrow">05 · Esquemático</p>
+      <h2>Esquemático eléctrico</h2>
+      <p class="lead">Así se conecta la aviónica: la <strong>Heltec WiFi LoRa 32 V3</strong> con el GPS, el GY-91 (acelerómetro + barómetro) y el servo del paracaídas. Todo se alimenta desde una <strong>LiPo 2S</strong> a través del LM2596; la Heltec recibe los 5.2 V por su conector USB-C mediante un cable USB modificado.</p>
+    </div>
+
+    <div class="esq-card reveal">
+      <div class="esq-top">
+      <div class="esq-tools">
+        <button class="btn btn-primary esq-dl" id="esqPng" type="button">⬇ Descargar imagen (PNG)</button>
+        <button class="btn btn-ghost esq-dl" id="esqSvg" type="button">SVG</button>
+        <span class="esq-dl-msg" id="esqDlMsg"></span>
+      </div>
+      <div class="esq-legend" id="esqLegend">
+        <button data-net="vbat"><i style="background:var(--c-vbat)"></i>Batería 7.4 V</button>
+        <button data-net="v5"><i style="background:var(--c-v5)"></i>5.2 V</button>
+        <button data-net="v33"><i style="background:var(--c-v33)"></i>3.3 V</button>
+        <button data-net="gnd"><i style="background:var(--c-gnd)"></i>GND común</button>
+        <button data-net="i2c"><i style="background:var(--c-i2c)"></i>I2C (SDA / SCL)</button>
+        <button data-net="uart"><i style="background:var(--c-uart)"></i>UART GPS</button>
+        <button data-net="pwm"><i style="background:var(--c-pwm)"></i>PWM servo</button>
+      </div>
+      </div>
+      <p class="esq-hint">Pasa el cursor por la leyenda o por un cable para resaltar esa conexión. Un punto indica unión; dos cables que se cruzan sin punto NO están conectados.</p>
+      <div class="esq-wrap">
+<svg id="sch" viewBox="0 0 1200 760" role="img" aria-label="Esquemático eléctrico de la aviónica">
+  <defs>
+    <pattern id="esqGridPat" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#14294a"/>
+    </pattern>
+    <!-- Símbolo de tierra -->
+    <g id="esqTierra">
+      <line x1="0" y1="0" x2="0" y2="10" stroke="var(--c-gnd)" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="-12" y1="10" x2="12" y2="10" stroke="var(--c-gnd)" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="-7" y1="15" x2="7" y2="15" stroke="var(--c-gnd)" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="-2.5" y1="20" x2="2.5" y2="20" stroke="var(--c-gnd)" stroke-width="2.4" stroke-linecap="round"/>
+    </g>
+  </defs>
+  <rect width="1200" height="760" fill="url(#esqGridPat)"/>
+
+  <!-- ============ ALIMENTACIÓN ============ -->
+  <!-- Batería -->
+  <rect class="box" x="40" y="36" width="170" height="114" rx="10"/>
+  <g transform="translate(126,94)">
+    <rect x="0" y="0" width="22" height="28" rx="3" fill="none" stroke="var(--c-vbat)" stroke-width="1.6"/>
+    <rect x="7" y="-4" width="8" height="4" rx="1" fill="var(--c-vbat)"/>
+    <rect x="28" y="0" width="22" height="28" rx="3" fill="none" stroke="var(--c-vbat)" stroke-width="1.6"/>
+    <rect x="35" y="-4" width="8" height="4" rx="1" fill="var(--c-vbat)"/>
+    <text x="11" y="18" text-anchor="middle" class="st" style="fill:var(--c-vbat);font-size:9px">3.7</text>
+    <text x="39" y="18" text-anchor="middle" class="st" style="fill:var(--c-vbat);font-size:9px">3.7</text>
+  </g>
+  <text x="56" y="64" class="ttl">LiPo 2S</text>
+  <text x="56" y="82" class="st">7.4 V nominal</text>
+  <text x="56" y="140" class="st">8.4 llena · 6.6 vacía</text>
+  <text x="200" y="74" text-anchor="end" class="pin" style="fill:var(--c-vbat)">+</text>
+  <text x="200" y="124" text-anchor="end" class="pin mute">−</text>
+
+  <!-- LM2596 -->
+  <rect class="box" x="290" y="36" width="190" height="114" rx="10"/>
+  <text x="385" y="64" text-anchor="middle" class="ttl">LM2596</text>
+  <text x="385" y="96" text-anchor="middle" class="st">buck DC-DC</text>
+  <text x="385" y="112" text-anchor="middle" class="st">salida 5.2 V</text>
+  <text x="298" y="74" class="pin">IN+</text>
+  <text x="298" y="124" class="pin mute">IN−</text>
+  <text x="472" y="74" text-anchor="end" class="pin">OUT+</text>
+  <text x="472" y="124" text-anchor="end" class="pin mute">OUT−</text>
+
+  <!-- Batería -> LM2596 -->
+  <path class="w" data-net="vbat" d="M210 70 H290"/>
+  <text x="250" y="62" text-anchor="middle" class="lbl" style="fill:var(--c-vbat)">7.4 V</text>
+  <path class="w" data-net="gnd" d="M210 120 H290"/>
+  <!-- OUT− a tierra -->
+  <path class="w" data-net="gnd" d="M480 120 H520 V150"/>
+  <use href="#esqTierra" x="520" y="150" data-net="gnd"/>
+  <text x="540" y="168" class="st">GND</text>
+
+  <!-- Interruptor -->
+  <path class="w" data-net="v5" d="M480 70 H562"/>
+  <circle cx="566" cy="70" r="4.5" fill="var(--bg1)" stroke="var(--c-v5)" stroke-width="2" data-net="v5" class="dot"/>
+  <circle cx="624" cy="70" r="4.5" fill="var(--bg1)" stroke="var(--c-v5)" stroke-width="2" data-net="v5" class="dot"/>
+  <line x1="569" y1="67" x2="618" y2="50" stroke="var(--c-v5)" stroke-width="2.4" stroke-linecap="round" data-net="v5" class="w"/>
+  <text x="595" y="38" text-anchor="middle" class="pin">INTERRUPTOR</text>
+  <text x="595" y="96" text-anchor="middle" class="st">ON / OFF</text>
+
+  <!-- Línea de 5.2 V -->
+  <path class="w" data-net="v5" d="M628 70 H880 V390 H940"/>
+  <text x="720" y="62" text-anchor="middle" class="lbl" style="fill:var(--c-v5)">5.2 V</text>
+  <!-- Rama al USB-C de la Heltec por cable USB (rojo = VBUS) -->
+  <path class="w" data-net="v5" d="M800 70 V280 H768"/>
+  <circle class="dot" data-net="v5" cx="800" cy="70" r="4.5"/>
+
+  <!-- ============ HELTEC V3 ============ -->
+  <rect class="box main" x="500" y="220" width="260" height="440" rx="14"/>
+  <!-- Conector USB-C: la Heltec se alimenta por aquí con un cable USB -->
+  <rect x="750" y="262" width="20" height="54" rx="6" fill="#0a1a2c" stroke="var(--c-v5)" stroke-width="1.6"/>
+  <text x="744" y="258" text-anchor="end" class="pin" style="fill:var(--c-v5)">USB-C</text>
+  <text x="742" y="284" text-anchor="end" class="pin">VBUS</text>
+  <text x="742" y="304" text-anchor="end" class="pin mute">GND</text>
+  <text x="742" y="326" text-anchor="end" class="st">alimentación por</text>
+  <text x="742" y="339" text-anchor="end" class="st">cable USB modificado</text>
+  <text x="630" y="470" text-anchor="middle" class="ttl big">HELTEC</text>
+  <text x="630" y="492" text-anchor="middle" class="ttl">WiFi LoRa 32 V3</text>
+  <text x="630" y="512" text-anchor="middle" class="st">ESP32-S3 · enlace ESP-NOW</text>
+  <text x="630" y="530" text-anchor="middle" class="st">computadora de vuelo</text>
+
+  <!-- Pines izquierda -->
+  <g class="pin">
+    <rect class="pinmark" x="496" y="266" width="8" height="8" rx="2"/><text x="512" y="274">3V3</text>
+    <rect class="pinmark" x="496" y="336" width="8" height="8" rx="2"/><text x="512" y="344" class="mute">GND</text>
+    <rect class="pinmark" x="496" y="396" width="8" height="8" rx="2"/><text x="512" y="404">GPIO42 · SCL</text>
+    <rect class="pinmark" x="496" y="426" width="8" height="8" rx="2"/><text x="512" y="434">GPIO41 · SDA</text>
+    <rect class="pinmark" x="496" y="596" width="8" height="8" rx="2"/><text x="512" y="604">GPIO6 · RX</text>
+    <rect class="pinmark" x="496" y="621" width="8" height="8" rx="2"/><text x="512" y="629">GPIO7 · TX</text>
+  </g>
+  <!-- Pines derecha -->
+  <g class="pin">
+    <rect class="pinmark" x="756" y="416" width="8" height="8" rx="2"/><text x="748" y="424" text-anchor="end">GPIO4 · PWM</text>
+  </g>
+
+  <!-- ============ GY-91 ============ -->
+  <rect class="box" x="40" y="226" width="210" height="250" rx="10"/>
+  <text x="56" y="252" class="ttl">GY-91</text>
+  <text x="56" y="270" class="st">MPU9250 + BMP280 · I2C</text>
+  <text x="56" y="284" class="st">0x68 (MPU) · 0x76 (BMP)</text>
+  <g class="pin">
+    <text x="240" y="300" text-anchor="end">VIN</text>
+    <text x="240" y="320" text-anchor="end">3V3</text>
+    <text x="240" y="340" text-anchor="end">CSB</text>
+    <text x="240" y="360" text-anchor="end" class="mute">GND</text>
+    <text x="240" y="380" text-anchor="end" class="mute">SDO</text>
+    <text x="240" y="404" text-anchor="end">SCL</text>
+    <text x="240" y="434" text-anchor="end">SDA</text>
+    <text x="240" y="460" text-anchor="end" class="mute">NCS · sin conexión</text>
+  </g>
+
+  <!-- ============ GPS ============ -->
+  <rect class="box" x="40" y="500" width="210" height="150" rx="10"/>
+  <text x="56" y="526" class="ttl">GPS</text>
+  <text x="56" y="544" class="st">GY-NEO6MV2 · NEO-6M</text>
+  <g class="pin">
+    <text x="240" y="564" text-anchor="end">VCC</text>
+    <text x="240" y="584" text-anchor="end" class="mute">GND</text>
+    <text x="240" y="604" text-anchor="end">TX</text>
+    <text x="240" y="629" text-anchor="end">RX</text>
+  </g>
+
+  <!-- ============ 3.3 V ============ -->
+  <path class="w" data-net="v33" d="M500 270 H310 V560 H250"/>
+  <path class="w" data-net="v33" d="M250 296 H310"/>
+  <path class="w" data-net="v33" d="M250 316 H310"/>
+  <path class="w" data-net="v33" d="M250 336 H310"/>
+  <circle class="dot" data-net="v33" cx="310" cy="296" r="4.5"/>
+  <circle class="dot" data-net="v33" cx="310" cy="316" r="4.5"/>
+  <circle class="dot" data-net="v33" cx="310" cy="336" r="4.5"/>
+  <text x="405" y="262" text-anchor="middle" class="lbl" style="fill:var(--c-v33)">3.3 V</text>
+
+  <!-- ============ GND ============ -->
+  <path class="w" data-net="gnd" d="M500 340 H340 V700 H840 V300 H768"/>
+  <text x="790" y="294" text-anchor="middle" class="lbl" style="fill:var(--c-gnd)">negro</text>
+  <text x="808" y="262" class="lbl" style="fill:var(--c-v5)">rojo</text>
+  <path class="w" data-net="gnd" d="M250 356 H340"/>
+  <path class="w" data-net="gnd" d="M250 376 H340"/>
+  <path class="w" data-net="gnd" d="M250 580 H340"/>
+  <circle class="dot" data-net="gnd" cx="340" cy="356" r="4.5"/>
+  <circle class="dot" data-net="gnd" cx="340" cy="376" r="4.5"/>
+  <circle class="dot" data-net="gnd" cx="340" cy="580" r="4.5"/>
+  <use href="#esqTierra" x="590" y="700" data-net="gnd"/>
+  <text x="610" y="726" class="lbl" style="fill:var(--c-gnd)">GND común</text>
+
+  <!-- ============ I2C ============ -->
+  <path class="w" data-net="i2c" d="M250 400 H500"/>
+  <path class="w" data-net="i2c" d="M250 430 H500"/>
+  <text x="420" y="394" text-anchor="middle" class="lbl" style="fill:var(--c-i2c)">SCL</text>
+  <text x="420" y="424" text-anchor="middle" class="lbl" style="fill:var(--c-i2c)">SDA</text>
+
+  <!-- NCS sin conexión -->
+  <path d="M250 456 H272" fill="none" stroke="var(--muted)" stroke-width="2"/>
+  <path d="M268 450 L280 462 M280 450 L268 462" stroke="var(--red)" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- ============ UART GPS ============ -->
+  <path class="w" data-net="uart" d="M250 600 H500"/>
+  <path class="w" data-net="uart" d="M250 625 H500"/>
+  <text x="420" y="594" text-anchor="middle" class="lbl" style="fill:var(--c-uart)">TX → RX</text>
+  <text x="420" y="619" text-anchor="middle" class="lbl" style="fill:var(--c-uart)">RX ← TX</text>
+
+  <!-- ============ SERVO ============ -->
+  <rect class="box" x="940" y="350" width="220" height="140" rx="10"/>
+  <text x="1068" y="380" text-anchor="middle" class="ttl">SERVO MG90S</text>
+  <text x="1068" y="398" text-anchor="middle" class="st">eyección del paracaídas</text>
+  <text x="1068" y="440" text-anchor="middle" class="st">0° trabado</text>
+  <text x="1068" y="456" text-anchor="middle" class="st">90° liberado</text>
+  <g class="pin">
+    <text x="950" y="394">V+</text>
+    <text x="950" y="424">SIG</text>
+    <text x="950" y="454" class="mute">GND</text>
+  </g>
+  <!-- Señal PWM -->
+  <path class="w" data-net="pwm" d="M760 420 H940"/>
+  <text x="800" y="414" text-anchor="middle" class="lbl" style="fill:var(--c-pwm)">PWM 50 Hz</text>
+  <!-- GND del servo -->
+  <path class="w" data-net="gnd" d="M940 450 H840"/>
+  <circle class="dot" data-net="gnd" cx="840" cy="450" r="4.5"/>
+
+  <!-- C1: condensador electrolítico 1000 µF en los bornes del servo -->
+  <path class="w" data-net="v5" d="M915 390 V413"/>
+  <path class="w" data-net="gnd" d="M915 427 V450"/>
+  <line x1="903" y1="413" x2="927" y2="413" stroke="var(--c-v5)" stroke-width="2.4" data-net="v5" class="w"/>
+  <path d="M903 429 Q915 421 927 429" fill="none" stroke="var(--c-gnd)" stroke-width="2.4" data-net="gnd" class="w"/>
+  <text x="898" y="410" text-anchor="end" class="pin" style="fill:var(--c-v5)">+</text>
+  <circle class="dot" data-net="v5" cx="915" cy="390" r="4"/>
+  <circle class="dot" data-net="gnd" cx="915" cy="450" r="4"/>
+  <text x="932" y="474" text-anchor="end" class="pin">C1</text>
+  <text x="932" y="487" text-anchor="end" class="st">1000 µF · 16 V</text>
+</svg>
+      </div>
+    </div>
+
+    <div class="esq-grid">
+      <div class="esq-card reveal">
+        <h3>Tabla de conexiones</h3>
+        <div class="esq-tbl-wrap">
+          <table class="esq-table">
+          <thead><tr><th>Módulo</th><th>Pin</th><th>Va a</th><th>Función</th></tr></thead>
+          <tbody>
+            <tr><td>Batería 2S</td><td>+ / −</td><td>LM2596 IN+ / IN−</td><td><span class="sw" style="background:var(--c-vbat)"></span>7.4 V</td></tr>
+            <tr><td>LM2596</td><td>OUT+</td><td>Interruptor → cable USB (rojo) y servo V+</td><td><span class="sw" style="background:var(--c-v5)"></span>5.2 V</td></tr>
+            <tr><td>Cable USB</td><td>rojo</td><td>5.2 V → USB-C Heltec (VBUS)</td><td><span class="sw" style="background:var(--c-v5)"></span>alimentación Heltec</td></tr>
+            <tr><td>Cable USB</td><td>negro</td><td>GND común → USB-C Heltec (GND)</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
+            <tr><td>Cable USB</td><td>verde / blanco</td><td>— (aislados)</td><td>datos, sin uso</td></tr>
+            <tr><td>LM2596</td><td>OUT−</td><td>GND común</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
+            <tr><td>GPS</td><td>VCC</td><td>Heltec 3V3</td><td><span class="sw" style="background:var(--c-v33)"></span>3.3 V</td></tr>
+            <tr><td>GPS</td><td>GND</td><td>GND</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
+            <tr><td>GPS</td><td>TX</td><td>Heltec GPIO6 (RX)</td><td><span class="sw" style="background:var(--c-uart)"></span>UART · datos NMEA</td></tr>
+            <tr><td>GPS</td><td>RX</td><td>Heltec GPIO7 (TX)</td><td><span class="sw" style="background:var(--c-uart)"></span>UART · configuración</td></tr>
+            <tr><td>GY-91</td><td>VIN, 3V3, CSB</td><td>Heltec 3V3</td><td><span class="sw" style="background:var(--c-v33)"></span>3.3 V · CSB alto = BMP280 en I2C</td></tr>
+            <tr><td>GY-91</td><td>GND, SDO</td><td>GND</td><td><span class="sw" style="background:var(--c-gnd)"></span>SDO bajo = direcciones 0x68 / 0x76</td></tr>
+            <tr><td>GY-91</td><td>SCL</td><td>Heltec GPIO42</td><td><span class="sw" style="background:var(--c-i2c)"></span>I2C reloj</td></tr>
+            <tr><td>GY-91</td><td>SDA</td><td>Heltec GPIO41</td><td><span class="sw" style="background:var(--c-i2c)"></span>I2C datos</td></tr>
+            <tr><td>GY-91</td><td>NCS</td><td>—</td><td>sin conexión</td></tr>
+            <tr><td>Servo MG90S</td><td>V+</td><td>5.2 V (tras el interruptor)</td><td><span class="sw" style="background:var(--c-v5)"></span>potencia</td></tr>
+            <tr><td>Servo MG90S</td><td>SIG</td><td>Heltec GPIO4</td><td><span class="sw" style="background:var(--c-pwm)"></span>PWM 50 Hz</td></tr>
+            <tr><td>Servo MG90S</td><td>GND</td><td>GND común</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
+            <tr><td>C1 1000 µF</td><td>+ / −</td><td>Servo V+ / servo GND</td><td><span class="sw" style="background:var(--c-v5)"></span>absorbe el pico del servo</td></tr>
+          </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="esq-card reveal">
+        <h3>Observaciones</h3>
+        <ul class="esq-notes">
+        <li><b>La Heltec se alimenta por su USB-C</b> con un cable USB modificado: rojo a 5.2 V y negro a GND. Es la misma entrada que usa con el PC, por eso funciona estable. Para programar, desconectar el cable de la batería y conectar el del PC.</li>
+        <li class="bad"><b>Asegurar el conector USB-C</b> con silicona caliente, cinta o brida. En el despegue hay 10–20 g: si se suelta, se pierden la telemetría y el paracaídas.</li>
+        <li class="warn"><b>Aislar los cables verde y blanco</b> (datos) del cable USB con cinta o termorretráctil para que no toquen nada.</li>
+        <li class="warn"><b>Ajustar el LM2596 antes de conectar.</b> Medir 5.0–5.2 V con multímetro y sin carga; de fábrica puede salir a 7–8 V.</li>
+        <li class="warn"><b>C1 (1000 µF) tiene polaridad.</b> La pata larga (+) va a V+ del servo y la franja blanca (−) a GND. Si se invierte se calienta y puede reventar. Debe ser de 10 V o más (mejor 16 V) y ir lo más cerca posible de los cables del servo. Absorbe el pico de arranque del servo para que no afecte a la Heltec justo en el apogeo.</li>
+        <li class="warn"><b>NCS del GY-91 sin conexión.</b> Funciona porque el módulo suele traer resistencia interna, pero conviene unirlo también a 3V3 para que el MPU9250 quede siempre en modo I2C.</li>
+        <li><b>VIN y 3V3 del GY-91 ambos a 3V3:</b> no hay problema. Bastaría con VIN; el pin 3V3 es la salida del regulador del propio módulo.</li>
+        <li><b>GND común:</b> todas las tierras (batería, LM2596, Heltec, sensores y servo) son el mismo nodo. Sin eso el servo no entiende la señal del GPIO4.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTES -->
+<section id="componentes">
+  <div class="wrap">
+    <div class="reveal">
+      <p class="eyebrow">06 · Componentes</p>
       <h2>Lista de componentes</h2>
       <p class="lead">Cada componente fue elegido con un criterio claro: hacer más con menos peso.</p>
     </div>

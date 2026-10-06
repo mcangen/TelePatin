@@ -85,6 +85,12 @@
 #define USAR_LONG_RANGE   0   // 1 = modo LR. Activarlo SOLO cuando el enlace ya funcione, y en ambos lados.
 uint8_t DIRECCION_BROADCAST[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
+// Potencia de transmisión (2 a 21 dBm). A 21 dBm cada envío pide picos de
+// ~350-400 mA: con USB no pasa nada, pero con una LiPo 1S por el JST el
+// voltaje se hunde y la placa se reinicia o la radio falla. 15 dBm reduce
+// mucho esos picos y sigue alcanzando ~100-200 m con vista despejada.
+const int POTENCIA_TX_DBM = 15;
+
 // 0 = el programa no genera señal para el servo (útil para descartar que el
 // servo cause reinicios). El resto de la prueba funciona igual.
 #define USAR_SERVO        1
@@ -458,7 +464,7 @@ bool espNowIniciar() {
   esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR);
 #endif
   WiFi.setChannel(ESPNOW_CANAL);
-  esp_wifi_set_max_tx_power(84);
+  esp_wifi_set_max_tx_power(constrain(POTENCIA_TX_DBM, 2, 21) * 4);  // En unidades de 0.25 dBm
 
   wifi_second_chan_t sec;
   esp_wifi_get_channel(&canalReal, &sec);
@@ -705,9 +711,26 @@ const char* motivoReinicio() {
   }
 }
 
+// Código de parpadeos del LED al arrancar (por si la pantalla no funciona):
+//   1 parpadeo largo   = arranque normal (encendido o botón RST)
+//   5 parpadeos rápidos = se reinició por BAJO VOLTAJE
+//   3 parpadeos medios = fallo del programa (panic / watchdog)
+void parpadearMotivoReinicio() {
+  esp_reset_reason_t r = esp_reset_reason();
+  int veces = 1, ms = 600;
+  if (r == ESP_RST_BROWNOUT) { veces = 5; ms = 100; }
+  else if (r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT) { veces = 3; ms = 250; }
+  for (int i = 0; i < veces; i++) {
+    digitalWrite(PIN_LED, HIGH); delay(ms);
+    digitalWrite(PIN_LED, LOW);  delay(ms);
+  }
+  delay(500);
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_LED, OUTPUT);
+  parpadearMotivoReinicio();
 
 #if USAR_SERVO
   // Servo primero: trabado desde el arranque
@@ -782,10 +805,10 @@ void loop() {
 
   if (ahora - tDiag >= PERIODO_DIAG_MS) {
     tDiag = ahora;
-    Serial.printf("# enviados=%lu al_aire=%lu fallo_aire=%lu fallo_send=%lu canal=%u radio=%d ultimo_error=%s\n",
+    Serial.printf("# enviados=%lu al_aire=%lu fallo_aire=%lu fallo_send=%lu canal=%u radio=%d tx=%ddBm ultimo_error=%s\n",
                   (unsigned long)paquetesEnviados, (unsigned long)alAireOk,
                   (unsigned long)alAireFallo, (unsigned long)fallos, canalReal, radioOk,
-                  esp_err_to_name(ultimoErrorEnvio));
+                  POTENCIA_TX_DBM, esp_err_to_name(ultimoErrorEnvio));
     Serial.printf("# gy91 mpu=%d bmp=%d alt=%.2f max=%.2f |a|=%.2fg\n",
                   mpuOk, bmpOk, altFilt, altMax, aMagG);
     Serial.printf("# gps estado=%d sats=%d caracteres=%lu frases_ok=%lu frases_mal=%lu\n",

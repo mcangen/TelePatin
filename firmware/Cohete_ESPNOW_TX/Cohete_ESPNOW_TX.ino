@@ -97,6 +97,11 @@
 #define USAR_LONG_RANGE   0   // 1 = modo LR (más alcance). Activarlo SOLO cuando el enlace ya funcione, y en ambos lados.
 uint8_t DIRECCION_BROADCAST[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
+// Potencia de transmisión (2 a 21 dBm). A 21 dBm cada envío pide picos de
+// ~350-400 mA: con una LiPo 1S por el JST el voltaje se hunde y la placa se
+// reinicia o la radio falla. 15 dBm alcanza ~100-200 m con vista despejada.
+const int POTENCIA_TX_DBM = 15;
+
 // ============================================================================
 //  PARÁMETROS DE VUELO  (los mismos de Cohete_TX)
 // ============================================================================
@@ -566,7 +571,7 @@ bool espNowIniciar() {
   esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR);
 #endif
   WiFi.setChannel(ESPNOW_CANAL);
-  esp_wifi_set_max_tx_power(84);  // 21 dBm, el máximo
+  esp_wifi_set_max_tx_power(constrain(POTENCIA_TX_DBM, 2, 21) * 4);  // En unidades de 0.25 dBm
 
   uint8_t canal; wifi_second_chan_t sec;
   esp_wifi_get_channel(&canal, &sec);
@@ -688,6 +693,24 @@ void atenderServoRemoto() {
 // ============================================================================
 //  SETUP
 // ============================================================================
+#ifdef PIN_LED
+// Código de parpadeos del LED al arrancar (por si la pantalla no funciona):
+//   1 parpadeo largo    = arranque normal (encendido o botón RST)
+//   5 parpadeos rápidos = se reinició por BAJO VOLTAJE
+//   3 parpadeos medios  = fallo del programa (panic / watchdog)
+void parpadearMotivoReinicio() {
+  esp_reset_reason_t r = esp_reset_reason();
+  Serial.printf("# Motivo del reinicio: %d\n", (int)r);
+  int veces = 1, ms = 600;
+  if (r == ESP_RST_BROWNOUT) { veces = 5; ms = 100; }
+  else if (r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT) { veces = 3; ms = 250; }
+  for (int i = 0; i < veces; i++) {
+    digitalWrite(PIN_LED, HIGH); delay(ms);
+    digitalWrite(PIN_LED, LOW);  delay(ms);
+  }
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_BOTON_TARA, INPUT_PULLUP);
@@ -698,6 +721,7 @@ void setup() {
 
 #ifdef PIN_LED
   pinMode(PIN_LED, OUTPUT);
+  parpadearMotivoReinicio();
 #endif
 
 #if ES_HELTEC
