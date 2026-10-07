@@ -286,6 +286,13 @@ $('btnClearSd').addEventListener('click',()=>{
 });
 
 /* ================= WEB SERIAL ================= */
+// En celulares y en Safari/Firefox no existe Web Serial: avisar desde el inicio
+// (lo demás sí funciona: cargar un vuelo guardado, el video, la simulación).
+if(!('serial' in navigator)){
+  $('btnSerial').disabled=true;
+  $('serialHint').textContent='⚠ Este navegador no puede conectar el receptor por USB (Web Serial solo existe en Chrome o Edge de computador). Aquí sí puedes cargar un vuelo guardado, ver el video o simular un vuelo.';
+}
+
 $('btnSerial').addEventListener('click',async()=>{
   if(!('serial' in navigator)){
     $('serialHint').textContent='⚠ Tu navegador no soporta Web Serial. Usa Chrome o Edge en escritorio.';

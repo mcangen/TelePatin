@@ -252,7 +252,8 @@ h2{
 
 /* ---------- TELEMETRÍA ---------- */
 .tele-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
-@media(max-width:920px){.tele-grid{grid-template-columns:1fr}}
+@media(max-width:920px){.tele-grid{grid-template-columns:minmax(0,1fr)}}
+.tele-grid>*{min-width:0}  /* Que el panel de datos animado no ensanche la columna */
 .flow{list-style:none;margin-top:26px}
 .flow li{
   display:flex;gap:16px;padding:14px 0;border-bottom:1px dashed var(--line);
@@ -289,6 +290,30 @@ h2{
 .comp-table td:last-child{color:var(--muted)}
 .comp-table tbody tr{transition:background .15s}
 .comp-table tbody tr:hover{background:rgba(47,230,200,.04)}
+
+/* ---------- CELULAR ---------- */
+@media(max-width:600px){
+  /* Botones con textos largos: que puedan partirse en dos líneas */
+  .btn{white-space:normal;text-align:center;justify-content:center;max-width:100%;padding:13px 20px}
+  .hero-actions .btn{flex:1 1 100%}
+  .hero-scroll{display:none}   /* En pantallas bajas se montaba sobre los botones */
+  .fake-rows{font-size:10.5px;overflow-x:auto}
+  .tele-panel{padding:18px 14px}
+  .hero-badge{font-size:10.5px;letter-spacing:.06em}
+  .lead{font-size:15.5px;margin-bottom:32px}
+  /* El esquemático mantiene su tamaño legible y se desplaza de lado */
+  .esq-hint::after{content:" En el celular, desliza el esquema hacia los lados para verlo completo.";color:var(--teal)}
+  .esq-dl{flex:1 1 auto}
+  /* Tabla de conexiones: en el celular, cada fila es una tarjeta apilada */
+  .esq-table thead{display:none}
+  .esq-table tr{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .esq-table tr td{border:0;padding:0;white-space:normal}
+  .esq-table td:nth-child(1){font-weight:600}
+  .esq-table td:nth-child(2){color:var(--teal)}
+  .esq-table td:nth-child(3){grid-column:1/-1;color:var(--muted)}
+  .esq-table td:nth-child(3)::before{content:"→ "}
+  .esq-table td:nth-child(4){grid-column:1/-1}
+}
 
 /* ---------- FOOTER ---------- */
 footer{
@@ -359,7 +384,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
 #sch[data-focus] .w{stroke-width:3.2}
 
 .esq-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;margin-top:18px}
-@media(max-width:920px){.esq-grid{grid-template-columns:1fr}}
+@media(max-width:920px){.esq-grid{grid-template-columns:minmax(0,1fr)}}
 .esq-tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
 .esq-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
 .esq-table th,.esq-table td{padding:8px 11px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
