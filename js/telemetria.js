@@ -53,7 +53,8 @@ function parseJsonLine(line){
   if(t==null) return null;
   if(t>10000) t=t/1000; // millis → segundos
   return {t, alt:g('alt'), temp:g('temp'), pres:g('pres'),
-          ax:g('ax'), ay:g('ay'), az:g('az'), lat:g('lat'), lon:g('lon')};
+          ax:g('ax'), ay:g('ay'), az:g('az'), lat:g('lat'), lon:g('lon'),
+          est:typeof o.est==='string'?o.est:null};
 }
 
 function parsePacketLine(line,delim=',',map=null){
@@ -133,6 +134,20 @@ Chart.defaults.borderColor='#1B3350';
 Chart.defaults.font.family="'IBM Plex Mono',monospace";
 Chart.defaults.font.size=10.5;
 Chart.defaults.animation=false;
+
+// Línea vertical que marca en las gráficas el instante que muestra el video
+let CURSOR_VIDEO=null; // tiempo (s) en la escala de las gráficas, o null
+Chart.register({
+  id:'cursorVideo',
+  afterDatasetsDraw(chart){
+    if(CURSOR_VIDEO==null) return;
+    const x=chart.scales.x; if(!x) return;
+    if(CURSOR_VIDEO<x.min || CURSOR_VIDEO>x.max) return;
+    const px=x.getPixelForValue(CURSOR_VIDEO), {top,bottom}=chart.chartArea, c=chart.ctx;
+    c.save(); c.strokeStyle='#FFB454'; c.lineWidth=1.5; c.setLineDash([5,4]);
+    c.beginPath(); c.moveTo(px,top); c.lineTo(px,bottom); c.stroke(); c.restore();
+  }
+});
 const baseOpts=(xTitle,yTitle)=>({
   responsive:true,maintainAspectRatio:false,
   interaction:{mode:'nearest',intersect:false},
@@ -336,7 +351,7 @@ function stopSerialUi(){
 // "#ENLACE {...}" que imprime el receptor para el RSSI.
 const L = {};
 function linkReset(){
-  Object.assign(L,{rx:0, firstN:null, lastN:null, lastAt:0, times:[], rssi:null, radio:null, log:[], gps:null, sats:null, imu:null, baro:null, para:null, est:null});
+  Object.assign(L,{rx:0, firstN:null, lastN:null, lastAt:0, times:[], rssi:null, radio:null, log:[], gps:null, sats:null, grx:null, rawT:null, rawAt:0, imu:null, baro:null, para:null, est:null});
   linkRender();
 }
 linkReset();
@@ -355,9 +370,14 @@ function linkTrack(line){
   // Estado de la tara: mensaje aparte, no es un paquete de telemetría
   if(o.tipo==='tara'){ T.est=o; T.estAt=now; return; }
   if(o.tipo==='servo'){ V.est=o; V.estAt=now; return; }
+  if(o.tipo==='cam'){ camTrack(o,now); return; }
 
   L.rx++; L.lastAt=now;
+  // Reloj del cohete (sin el desfase del cronómetro): sirve para ubicar en
+  // el tiempo cuándo empezó a grabar la cámara
+  if(typeof o.t==='number'){ L.rawT=o.t>10000?o.t/1000:o.t; L.rawAt=now; }
   if(typeof o.gps==='number') L.gps=o.gps;   // 0 sin datos, 1 sin fix, 2 con fix
+  if(typeof o.grx==='number') L.grx=o.grx;   // cable RX del GPS: 1 probando, 2 OK, 3 sin respuesta
   if(typeof o.sats==='number') L.sats=o.sats;
   if(typeof o.imu==='number') L.imu=o.imu;    // 1 aceleración real, 0 simulada
   if(typeof o.baro==='number') L.baro=o.baro; // 1 altitud real, 0 simulada
@@ -389,6 +409,14 @@ function linkRender(){
   $('lkRssi').textContent=L.rssi!=null?L.rssi+' dBm':'—';
   const gpsTxt={0:'SIN DATOS',1:`BUSCANDO · ${L.sats??0} sat`,2:`FIX · ${L.sats??0} sat`};
   $('lkGps').textContent=L.gps!=null?gpsTxt[L.gps]:'—';
+  // Segunda línea: verificación del cable RX del GPS (Heltec -> GPS)
+  const grx={1:['RX: probando…','var(--muted)'],2:['RX: OK ✓','var(--teal)'],3:['RX: sin respuesta ✗','var(--red)']}[L.grx];
+  if(grx){
+    const s=document.createElement('small');
+    s.style.cssText=`display:block;font-size:11px;font-family:var(--mono);color:${grx[1]}`;
+    s.textContent=grx[0];
+    $('lkGps').appendChild(s);
+  }
   $('lkGps').style.color=L.gps===2?'var(--teal)':L.gps===1?'var(--amber)':L.gps===0?'var(--red)':'';
   if(L.para==null){ $('lkPara').textContent='—'; $('lkPara').style.color=''; }
   else{
@@ -675,3 +703,288 @@ setInterval(()=>{ if(F.estado==='corriendo') vueloRender(); },100);
 vueloRender();
 
 requestRender();
+
+/* ================= CÁMARA A BORDO ================= */
+// La cámara responde cada segundo: {"tipo":"cam","id","res","rec","dir","seg","img","fps","mb","libre","err"}
+// K.eventos[carpeta] = tiempo del cohete (s, sin desfase del cronómetro) en que empezó esa grabación
+const K = {est:null, estAt:0, pendId:null, pendAt:0, aviso:null, avisoAt:0, eventos:{}};
+const CAM_RES = {
+  1:['ok','Grabación iniciada.'],
+  2:['ok','Grabación detenida y guardada en la microSD.'],
+  3:['warn','La cámara ya estaba grabando.'],
+  4:['warn','La cámara no estaba grabando.'],
+  5:['bad','No se puede grabar: revisa la microSD o la cámara.'],
+};
+const CAM_ERR = {1:'sin microSD', 2:'cámara no detectada', 3:'error al escribir en la microSD'};
+
+// Tiempo del cohete "ahora", extrapolado desde el último paquete recibido
+function rawAhora(now){ return L.rawT!=null ? L.rawT+(now-L.rawAt)/1000 : null; }
+// Tiempo del cohete -> escala de las gráficas (que se pone en 0 con "Iniciar")
+function rawADisplay(raw){ return (F.estado!=='libre' && F.t0!=null) ? raw-F.t0 : raw; }
+
+function camTrack(o,now){
+  K.est=o; K.estAt=now;
+  // Primera vez que se ve una grabación: anotar cuándo empezó (para sincronizar el video)
+  if(o.rec===1 && o.dir && !(o.dir in K.eventos)){
+    const raw=rawAhora(now);
+    K.eventos[o.dir] = raw!=null ? +(raw-(o.seg||0)).toFixed(2) : null;
+  }
+}
+
+function camViva(now){ return K.est && now-K.estAt<4000; }
+
+$('btnCamOn').addEventListener('click',async()=>{ await enviarOrden('CAM_ON',K); camRender(); });
+$('btnCamOff').addEventListener('click',async()=>{ await enviarOrden('CAM_OFF',K); camRender(); });
+
+function camRender(){
+  const now=performance.now(), e=K.est, viva=camViva(now), rec=viva && e.rec===1;
+  const pill=$('pillCam');
+  if(!viva){ pill.textContent=e?'SIN SEÑAL':'SIN DATOS'; pill.className='pill'+(e?' warn':''); }
+  else if(e.err===1||e.err===2){ pill.textContent='ERROR'; pill.className='pill bad'; }
+  else if(rec){ pill.textContent='● GRABANDO'; pill.className='pill rec'; }
+  else { pill.textContent='EN ESPERA'; pill.className='pill ok'; }
+
+  const fmtSeg=s=>{const m=Math.floor(s/60);return `${m}:${(s-m*60).toFixed(0).padStart(2,'0')}`;};
+  $('camDir').textContent = e&&e.dir ? e.dir : '—';
+  $('camSeg').textContent = viva&&rec ? fmtSeg(e.seg) : '—';
+  $('camFps').textContent = viva&&rec&&e.fps ? e.fps.toFixed(1) : '—';
+  $('camMb').textContent  = viva&&e.mb!=null&&e.dir ? e.mb.toFixed(1)+' MB' : '—';
+  $('camLibre').textContent = viva&&e.libre!=null ? (e.libre/1024).toFixed(1)+' GB' : '—';
+
+  const pend=K.pendId!=null;
+  $('btnCamOn').disabled  = !S.serialActive || pend || rec;
+  $('btnCamOff').disabled = !S.serialActive || pend || (viva && !rec);
+
+  const el=$('camTxt');
+  if(ordenPendiente(K,CAM_RES,now)){ el.className='tara-txt warn'; el.textContent='Enviando orden a la cámara…'; }
+  else if(K.aviso && now-K.avisoAt<10000){ el.className='tara-txt '+K.aviso[0]; el.textContent=K.aviso[1]; }
+  else if(viva && e.err){ el.className='tara-txt bad'; el.textContent='Error: '+(CAM_ERR[e.err]||'desconocido'); }
+  else if(viva){ el.className='tara-txt'; el.textContent=rec?`Grabando en ${e.dir} (${e.resol||''}).`:'Lista para grabar.'; }
+  else { el.className='tara-txt'; el.textContent=S.serialActive?'Esperando señal de la cámara… (¿está encendida?)':'Conecta el receptor para controlar la cámara.'; }
+
+  // Aviso en el cronómetro: vuelo en curso y la cámara no graba
+  $('camAviso').hidden = !(F.estado==='corriendo' && !rec);
+}
+setInterval(camRender,500);
+
+/* ================= GUARDAR / CARGAR VUELO ================= */
+// Guarda la telemetría, el cronómetro y cuándo empezó cada grabación de la
+// cámara: con eso el video se puede sincronizar después, en cualquier PC.
+$('btnGuardarVuelo').addEventListener('click',()=>{
+  const d={formato:'telepatin-vuelo', version:1, guardado:new Date().toISOString(),
+    t0:F.t0, cronometro:F.estado, duracion:vueloSegundos(), tx:S.tx, camaras:K.eventos};
+  const blob=new Blob([JSON.stringify(d)],{type:'application/json'});
+  const fecha=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=`vuelo_${fecha}.json`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  $('vueloHint').textContent=`Guardado: ${S.tx.length} paquetes.`;
+});
+
+$('fileVuelo').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(d.formato!=='telepatin-vuelo' || !Array.isArray(d.tx)) throw new Error('no es un vuelo guardado del dashboard');
+    S.tx=d.tx;
+    Object.assign(F,{estado:d.t0!=null?'detenido':'libre', t0:d.t0??null, dur:d.duracion||0, iniWall:0});
+    Object.assign(K.eventos, d.camaras||{});
+    vueloRender(); requestRender(); vpAplicarSync();
+    $('vueloHint').textContent=`Cargado: ${f.name} (${S.tx.length} paquetes).`;
+  }catch(err){
+    $('vueloHint').textContent='No se pudo cargar: '+err.message;
+  }
+  e.target.value='';
+});
+
+/* ================= REPRODUCTOR DE VIDEO (MJPEG del ESP32-CAM) ================= */
+// Lee video.mjpeg (+ video_2.mjpeg…) y tiempos.csv directamente: cada fila de
+// tiempos.csv dice cuánto mide cada imagen, así se ubica sin decodificar todo.
+const VP = {frames:[], files:[], dur:0, t:0, playing:false, idx:-1, nombre:'',
+            offset:null, decod:false, pendiente:-1, lastTs:0};
+
+const fmtVT=s=>{const m=Math.floor(s/60), r=s-m*60; return `${m}:${r.toFixed(2).padStart(5,'0')}`;};
+
+async function vpCargar(lista){
+  const archivos=[...lista];
+  const videos=archivos.filter(f=>/^video(_\d+)?\.mjpe?g$/i.test(f.name))
+    .sort((a,b)=>(+(a.name.match(/_(\d+)/)||[0,1])[1])-(+(b.name.match(/_(\d+)/)||[0,1])[1]));
+  const csv=archivos.find(f=>/^tiempos\.csv$/i.test(f.name));
+  const info=archivos.find(f=>/^info\.txt$/i.test(f.name));
+  if(!videos.length){ $('videoHint').textContent='No se encontró video.mjpeg en lo elegido.'; return; }
+
+  // Nombre de la grabación: la carpeta (cam_003) o lo que diga info.txt
+  let nombre=(videos[0].webkitRelativePath||'').split('/').slice(-2,-1)[0]||'';
+  const infoTxt=info?await info.text():'';
+  const mInfo=infoTxt.match(/carpeta=(\S+)/); if(mInfo) nombre=mInfo[1];
+  const mFps=infoTxt.match(/fps_promedio=([\d.]+)/);
+
+  $('videoHint').textContent='Leyendo…';
+  let frames=[];
+  if(csv){
+    const filas=(await csv.text()).split(/\r?\n/).slice(1).map(l=>l.split(',')).filter(c=>c.length>=3);
+    let fi=0, off=0;
+    for(const c of filas){
+      const ms=+c[1], len=+c[2];
+      if(!(len>0)) continue;
+      if(off+len>videos[fi].size){ fi++; off=0; if(fi>=videos.length) break; }
+      if(off+len>videos[fi].size) break;          // Última imagen cortada (se fue la energía)
+      frames.push({t:ms/1000, f:fi, off, len});
+      off+=len;
+    }
+    // Comprobar que la primera imagen empieza donde dice tiempos.csv
+    if(frames.length){
+      const cab=new Uint8Array(await videos[0].slice(0,2).arrayBuffer());
+      if(cab[0]!==0xFF||cab[1]!==0xD8) frames=[];
+    }
+  }
+  if(!frames.length){
+    // Sin tiempos.csv (o no coincide): buscar las imágenes por sus marcas JPEG
+    const fps=mFps?+mFps[1]:12;
+    for(let fi=0;fi<videos.length;fi++){
+      const b=new Uint8Array(await videos[fi].arrayBuffer());
+      const inicios=[];
+      for(let i=0;i<b.length-2;i++) if(b[i]===0xFF&&b[i+1]===0xD8&&b[i+2]===0xFF) inicios.push(i);
+      inicios.forEach((p,k)=>{ const fin=k+1<inicios.length?inicios[k+1]:b.length;
+        frames.push({t:frames.length/fps, f:fi, off:p, len:fin-p}); });
+    }
+  }
+  if(!frames.length){ $('videoHint').textContent='No se encontraron imágenes en el video.'; return; }
+
+  // Tiempos relativos a la primera imagen
+  const t0=frames[0].t; frames.forEach(fr=>fr.t-=t0);
+  Object.assign(VP,{frames, files:videos, dur:frames[frames.length-1].t, t:0, playing:false, idx:-1, nombre, pendiente:-1});
+  $('vp').hidden=false;
+  $('pillVideo').textContent=nombre?nombre.toUpperCase():'VIDEO'; $('pillVideo').className='pill ok';
+  const fpsReal=VP.dur>0?(frames.length-1)/VP.dur:0;
+  $('vpInfo').textContent=`${frames.length} imágenes · ${fmtVT(VP.dur)} · ${fpsReal.toFixed(1)} img/s`;
+  $('videoHint').textContent='';
+  vpAplicarSync();
+  vpIr(0);
+}
+
+$('fileVideo').addEventListener('change',e=>{ if(e.target.files.length) vpCargar(e.target.files); e.target.value=''; });
+$('fileVideoArch').addEventListener('change',e=>{ if(e.target.files.length) vpCargar(e.target.files); e.target.value=''; });
+
+// Índice de la imagen que corresponde al tiempo t (búsqueda binaria)
+function vpIndice(t){
+  const fr=VP.frames; let lo=0, hi=fr.length-1;
+  while(lo<hi){ const m=(lo+hi+1)>>1; if(fr[m].t<=t) lo=m; else hi=m-1; }
+  return lo;
+}
+
+async function vpMostrar(i){
+  if(VP.decod){ VP.pendiente=i; return; }   // Si aún decodifica la anterior, mostrar la última pedida
+  VP.decod=true;
+  try{
+    const fr=VP.frames[i];
+    const bmp=await createImageBitmap(VP.files[fr.f].slice(fr.off,fr.off+fr.len,'image/jpeg'));
+    const c=$('vpCanvas');
+    if(c.width!==bmp.width||c.height!==bmp.height){ c.width=bmp.width; c.height=bmp.height; }
+    c.getContext('2d').drawImage(bmp,0,0);
+    bmp.close();
+  }catch(err){ /* imagen dañada: se salta */ }
+  VP.decod=false;
+  if(VP.pendiente>=0 && VP.pendiente!==i){ const p=VP.pendiente; VP.pendiente=-1; vpMostrar(p); }
+  else VP.pendiente=-1;
+}
+
+function vpIr(t){
+  VP.t=Math.max(0,Math.min(VP.dur,t));
+  const i=vpIndice(VP.t);
+  if(i!==VP.idx){ VP.idx=i; vpMostrar(i); }
+  vpUI();
+}
+
+function vpPausar(){ VP.playing=false; $('vpPlay').textContent='▶'; }
+function vpPlay(){
+  if(!VP.frames.length) return;
+  if(VP.t>=VP.dur) VP.t=0;
+  VP.playing=true; VP.lastTs=performance.now(); $('vpPlay').textContent='⏸';
+  requestAnimationFrame(vpTick);
+}
+function vpTick(ts){
+  if(!VP.playing) return;
+  const dt=(ts-VP.lastTs)/1000; VP.lastTs=ts;
+  vpIr(VP.t+dt*(+$('vpVel').value));
+  if(VP.t>=VP.dur){ vpPausar(); return; }
+  requestAnimationFrame(vpTick);
+}
+function vpPaso(d){ vpPausar(); const i=Math.max(0,Math.min(VP.frames.length-1,VP.idx+d)); vpIr(VP.frames[i].t); }
+
+$('vpPlay').addEventListener('click',()=>VP.playing?vpPausar():vpPlay());
+$('vpPrev').addEventListener('click',()=>vpPaso(-1));
+$('vpNext').addEventListener('click',()=>vpPaso(1));
+$('vpBarra').addEventListener('input',e=>{ vpPausar(); vpIr(e.target.value/1000*VP.dur); });
+$('vpFull').addEventListener('click',()=>{ const p=$('vpPantalla'); document.fullscreenElement?document.exitFullscreen():p.requestFullscreen(); });
+$('vpFoto').addEventListener('click',()=>{
+  if(VP.idx<0) return;
+  const fr=VP.frames[VP.idx];   // La imagen JPEG original, sin recomprimir
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(VP.files[fr.f].slice(fr.off,fr.off+fr.len,'image/jpeg'));
+  a.download=`${VP.nombre||'video'}_img${VP.idx+1}.jpg`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+});
+
+// Teclado: espacio = play/pausa, flechas = imagen por imagen
+document.addEventListener('keydown',e=>{
+  if($('vp').hidden || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if(e.key===' '){ e.preventDefault(); VP.playing?vpPausar():vpPlay(); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); vpPaso(-1); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); vpPaso(1); }
+});
+
+// ---- Sincronización con la telemetría ----
+function vpAplicarSync(){
+  if(!VP.frames.length) return;
+  const raw=K.eventos[VP.nombre];
+  if(raw!=null){
+    VP.offset=+rawADisplay(raw).toFixed(2);
+    $('vpOffset').value=VP.offset;
+    $('vpSyncTxt').textContent='✓ Sincronizado con el momento en que la cámara empezó a grabar.';
+  }else if(VP.offset==null){
+    $('vpOffset').value='';
+    $('vpSyncTxt').textContent='Sin sincronizar: carga el vuelo guardado o escribe el T de inicio.';
+  }
+  vpUI();
+}
+$('vpOffset').addEventListener('change',e=>{
+  const v=parseFloat(e.target.value);
+  VP.offset=isNaN(v)?null:v;
+  $('vpSyncTxt').textContent=VP.offset==null?'Sin sincronizar.':'Sincronización manual.';
+  vpUI();
+});
+
+// Paquete de telemetría más cercano a un tiempo (en la escala de las gráficas)
+function telemetriaEn(t){
+  const d=S.tx; if(!d.length) return null;
+  let lo=0, hi=d.length-1;
+  while(lo<hi){ const m=(lo+hi)>>1; if(d[m].t<t) lo=m+1; else hi=m; }
+  const p=(lo>0 && Math.abs(d[lo-1].t-t)<Math.abs(d[lo].t-t))?d[lo-1]:d[lo];
+  return Math.abs(p.t-t)<1.5?p:null;
+}
+
+function vpUI(){
+  $('vpBarra').value=VP.dur>0?Math.round(VP.t/VP.dur*1000):0;
+  $('vpTiempo').textContent=`${fmtVT(VP.t)} / ${fmtVT(VP.dur)}`;
+  const ov=$('vpOverlay');
+  if(VP.offset!=null){
+    const tt=VP.offset+VP.t, p=telemetriaEn(tt);
+    ov.hidden=false;
+    ov.textContent=`T ${tt>=0?'+':''}${tt.toFixed(2)} s`+(p?` · ${p.alt!=null?p.alt.toFixed(1)+' m':'—'}${p.est?' · '+p.est:''}`:'');
+    const tq=Math.round(tt*20)/20;   // Redibujar las gráficas como mucho cada 0.05 s
+    if(CURSOR_VIDEO!==tq){ CURSOR_VIDEO=tq; [chAlt,chVel,chAcc,chAtm].forEach(ch=>ch.draw()); }
+  }else{
+    ov.hidden=true;
+    if(CURSOR_VIDEO!==null){ CURSOR_VIDEO=null; [chAlt,chVel,chAcc,chAtm].forEach(ch=>ch.draw()); }
+  }
+}
+
+// Clic en cualquier gráfica: el video salta a ese instante
+[chAlt,chVel,chAcc,chAtm].forEach(ch=>{
+  ch.options.onClick=(e,els,chart)=>{
+    if(!VP.frames.length || VP.offset==null) return;
+    vpPausar(); vpIr(chart.scales.x.getValueForPixel(e.x)-VP.offset);
+    document.getElementById('vp').scrollIntoView({behavior:'smooth',block:'center'});
+  };
+});

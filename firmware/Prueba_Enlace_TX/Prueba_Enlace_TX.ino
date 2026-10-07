@@ -13,6 +13,7 @@
  *
  *  Campos de estado del JSON:
  *    "gps":  0 = no llegan datos del módulo, 1 = sin fix, 2 = con fix
+ *    "grx":  cable RX del GPS: 0 sin probar, 1 probando, 2 OK, 3 sin respuesta
  *    "imu":  1 = aceleración real del MPU,   0 = simulada
  *    "baro": 1 = altitud real del BMP280,    0 = simulada
  *
@@ -33,7 +34,7 @@
  *
  *  Conexión del GPS (Heltec V3):
  *    VCC -> 3V3 (NEO-6M) o 5V (NEO-M8N, consume más)     GND -> GND
- *    TX del GPS -> GPIO 6     RX del GPS -> GPIO 7
+ *    TX del GPS -> GPIO 7     RX del GPS -> GPIO 5
  *  El RX del GPS SÍ hace falta: por ahí se le pide al M8N que active NMEA.
  *  (En un ESP32 DevKit: TX del GPS -> 16, RX del GPS -> 17)
  *
@@ -62,8 +63,8 @@
   #define PIN_OLED_RST 21
   #define PIN_VEXT     36
   #define PIN_LED      35
-  #define PIN_GPS_RX   6    // Al TX del módulo GPS
-  #define PIN_GPS_TX   7    // Al RX del módulo GPS
+  #define PIN_GPS_RX   7    // Al TX del módulo GPS
+  #define PIN_GPS_TX   5    // Al RX del módulo GPS
   #define PIN_SENSOR_SDA 41
   #define PIN_SENSOR_SCL 42
   #define PIN_SERVO      4
@@ -197,6 +198,16 @@ uint32_t gpsBytesVentana = 0, gpsBytesUltimaVentana = 0;
 bool     gpsVioUbx = false;
 uint8_t  gpsByteAnterior = 0;
 
+// Verificación del cable RX del GPS (Heltec -> GPS). Que lleguen datos solo
+// prueba el TX del GPS; para probar el RX se le hace una consulta UBX
+// inofensiva (CFG-RATE, solo lectura) y se espera su respuesta o su ACK.
+enum { GRX_SIN_PROBAR = 0, GRX_PROBANDO = 1, GRX_OK = 2, GRX_SIN_RESPUESTA = 3 };
+const uint32_t GRX_ESPERA_MS  = 1500;
+const uint8_t  GRX_INTENTOS   = 3;
+uint8_t  gpsRxEstado = GRX_SIN_PROBAR, gpsRxIntentos = 0;
+uint32_t tGpsRxPrueba = 0;
+uint8_t  ubxVentana[8] = { 0 };   // Últimos 8 bytes recibidos del GPS
+
 // ============================================================================
 //  GPS (no bloqueante)
 // ============================================================================
@@ -237,6 +248,24 @@ void gpsAbrir(uint8_t indice) {
   gpsVioUbx = false;
 }
 
+// Consulta UBX-CFG-RATE (solo lectura: no cambia nada en el GPS)
+void gpsRxProbar() {
+  ubxEnviar(0x06, 0x08, nullptr, 0);
+  tGpsRxPrueba = millis();
+  gpsRxIntentos++;
+  gpsRxEstado = GRX_PROBANDO;
+}
+
+// ¿Los últimos bytes son la respuesta del GPS a la consulta? Vale tanto la
+// respuesta CFG-RATE como el ACK o el NAK: los tres prueban que la recibió.
+bool gpsRespondioConsulta() {
+  static const uint8_t ACK[8]  = { 0xB5, 0x62, 0x05, 0x01, 0x02, 0x00, 0x06, 0x08 };
+  static const uint8_t NAK[8]  = { 0xB5, 0x62, 0x05, 0x00, 0x02, 0x00, 0x06, 0x08 };
+  static const uint8_t RESP[6] = { 0xB5, 0x62, 0x06, 0x08, 0x06, 0x00 };
+  return memcmp(ubxVentana, ACK, 8) == 0 || memcmp(ubxVentana, NAK, 8) == 0 ||
+         memcmp(ubxVentana + 2, RESP, 6) == 0;
+}
+
 void atenderGps(uint32_t ahora) {
   while (gpsSerial.available() > 0) {
     uint8_t c = gpsSerial.read();
@@ -244,6 +273,23 @@ void atenderGps(uint32_t ahora) {
     gpsBytesVentana++;
     if (gpsByteAnterior == 0xB5 && c == 0x62) gpsVioUbx = true;  // Cabecera UBX
     gpsByteAnterior = c;
+
+    memmove(ubxVentana, ubxVentana + 1, 7);
+    ubxVentana[7] = c;
+    if (gpsRxEstado == GRX_PROBANDO && gpsRespondioConsulta()) {
+      gpsRxEstado = GRX_OK;
+      Serial.println("# GPS RX: OK (el GPS respondio a la consulta: cable RX bien)");
+    }
+  }
+
+  // Sin respuesta: reintentar y, tras varios intentos, avisar
+  if (gpsRxEstado == GRX_PROBANDO && millis() - tGpsRxPrueba >= GRX_ESPERA_MS) {
+    if (gpsRxIntentos < GRX_INTENTOS) {
+      gpsRxProbar();
+    } else {
+      gpsRxEstado = GRX_SIN_RESPUESTA;
+      Serial.printf("# GPS RX: SIN RESPUESTA (revisar cable RX del GPS -> GPIO %d)\n", PIN_GPS_TX);
+    }
   }
 
   // Solo una frase NMEA con checksum correcto confirma la velocidad.
@@ -251,6 +297,7 @@ void atenderGps(uint32_t ahora) {
     if (gps.passedChecksum() > 0) {
       gpsBaudOk = true;
       Serial.printf("# GPS conectado a %lu baudios\n", (unsigned long)GPS_BAUDIOS[gpsIndiceBaud]);
+      gpsRxProbar();  // Velocidad conocida: ahora probar el cable RX
     } else if (ahora - tCambioBaud >= GPS_CAMBIO_BAUD_MS) {
       Serial.printf("# GPS a %lu baud: %lu bytes, %s\n",
                     (unsigned long)GPS_BAUDIOS[gpsIndiceBaud], (unsigned long)gpsBytesVentana,
@@ -530,9 +577,9 @@ void enviarPrueba(uint32_t ahora) {
   int len = snprintf(json, sizeof(json),
       "{\"n\":%lu,\"t\":%.2f,\"alt\":%.2f,\"altMax\":%.2f,\"temp\":%.1f,\"hum\":%s,"
       "\"pres\":%.2f,\"ax\":%.2f,\"ay\":%.2f,\"az\":%.2f,\"lat\":%s,\"lon\":%s,"
-      "\"sats\":%d,\"gps\":%d,\"imu\":%d,\"baro\":%d,\"para\":%d,\"est\":\"%s\"}",
+      "\"sats\":%d,\"gps\":%d,\"grx\":%d,\"imu\":%d,\"baro\":%d,\"para\":%d,\"est\":\"%s\"}",
       (unsigned long)paquetesEnviados, t, alt, altMaxEnv, temp, sHum, pres, axE, ayE, azE,
-      sLat, sLon, gpsSatelites(), gpsEstado(), mpuOk ? 1 : 0, bmpOk ? 1 : 0,
+      sLat, sLon, gpsSatelites(), gpsEstado(), gpsRxEstado, mpuOk ? 1 : 0, bmpOk ? 1 : 0,
       paracaidas ? 1 : 0, NOMBRE_PRUEBA[estadoApo]);
   if (len <= 0 || len >= (int)sizeof(json)) return;
 
@@ -687,8 +734,12 @@ void actualizarOled() {
       else
         snprintf(l, sizeof(l), "GPS: SIN DATOS %lubd", (unsigned long)GPS_BAUDIOS[gpsIndiceBaud]);
       break;
-    case 1:  snprintf(l, sizeof(l), "GPS: buscando Sat:%d", gpsSatelites()); break;
-    default: snprintf(l, sizeof(l), "GPS: FIX Sat:%d", gpsSatelites()); break;
+    default: {
+      const char* rx = gpsRxEstado == GRX_OK ? "OK" : gpsRxEstado == GRX_SIN_RESPUESTA ? "X" : "..";
+      snprintf(l, sizeof(l), "GPS:%s S:%d RX:%s", gpsEstado() == 2 ? "FIX" : "busca",
+               gpsSatelites(), rx);
+      break;
+    }
   }
   display.drawStr(0, 60, l);
   display.sendBuffer();
@@ -811,8 +862,8 @@ void loop() {
                   POTENCIA_TX_DBM, esp_err_to_name(ultimoErrorEnvio));
     Serial.printf("# gy91 mpu=%d bmp=%d alt=%.2f max=%.2f |a|=%.2fg\n",
                   mpuOk, bmpOk, altFilt, altMax, aMagG);
-    Serial.printf("# gps estado=%d sats=%d caracteres=%lu frases_ok=%lu frases_mal=%lu\n",
-                  gpsEstado(), gpsSatelites(), (unsigned long)gps.charsProcessed(),
+    Serial.printf("# gps estado=%d rx=%d sats=%d caracteres=%lu frases_ok=%lu frases_mal=%lu\n",
+                  gpsEstado(), gpsRxEstado, gpsSatelites(), (unsigned long)gps.charsProcessed(),
                   (unsigned long)gps.passedChecksum(), (unsigned long)gps.failedChecksum());
   }
 

@@ -29,7 +29,7 @@
  *  Con USB conectado, el Monitor Serie (115200) muestra lo mismo en texto.
  *
  *  Conexiones (Heltec V3): GY-91 SDA 41 / SCL 42 / VIN 3V3,
- *  GPS TX->6 / RX->7, servo señal GPIO 4 (5 V del LM2596, GND común).
+ *  GPS TX->7 / RX->5, servo señal GPIO 4 (5 V del LM2596, GND común).
  *  Librerías: TinyGPSPlus, Adafruit BMP280 Library; U8g2 solo en la Heltec.
  * ============================================================================
  */
@@ -47,8 +47,8 @@
   #define PIN_OLED_RST 21
   #define PIN_VEXT     36
   #define PIN_LED      35
-  #define PIN_GPS_RX   6
-  #define PIN_GPS_TX   7
+  #define PIN_GPS_RX   7    // Al TX del GPS
+  #define PIN_GPS_TX   5    // Al RX del GPS
   #define PIN_SENSOR_SDA 41
   #define PIN_SENSOR_SCL 42
   #define PIN_SERVO      4

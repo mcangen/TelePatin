@@ -306,6 +306,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
   /* Colores de cada red eléctrica */
   --c-vbat:var(--orange); --c-v5:var(--red); --c-v33:var(--amber); --c-gnd:#8FA6BE;
   --c-i2c:var(--teal); --c-uart:var(--blue); --c-pwm:var(--violet);
+  --c-radio:#7FD8FF; --c-usb:#DCE9F5;
 }
 .esq-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:clamp(16px,3vw,26px)}
 .esq-card h3{font-family:var(--display);font-size:17px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
@@ -345,13 +346,16 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
 #sch [data-net="i2c"].w{stroke:var(--c-i2c)}   #sch [data-net="i2c"].dot{fill:var(--c-i2c)}
 #sch [data-net="uart"].w{stroke:var(--c-uart)} #sch [data-net="uart"].dot{fill:var(--c-uart)}
 #sch [data-net="pwm"].w{stroke:var(--c-pwm)}   #sch [data-net="pwm"].dot{fill:var(--c-pwm)}
+#sch [data-net="radio"].w{stroke:var(--c-radio);stroke-dasharray:8 6}
+#sch [data-net="usb"].w{stroke:var(--c-usb)}
 #sch .pinmark{fill:var(--bg1);stroke:#3b6390;stroke-width:1.2}
 /* Resaltado de una red: atenúa todo lo demás */
 #sch[data-focus] [data-net]{opacity:.13}
 #sch[data-focus="vbat"] [data-net="vbat"],#sch[data-focus="v5"] [data-net="v5"],
 #sch[data-focus="v33"] [data-net="v33"],#sch[data-focus="gnd"] [data-net="gnd"],
 #sch[data-focus="i2c"] [data-net="i2c"],#sch[data-focus="uart"] [data-net="uart"],
-#sch[data-focus="pwm"] [data-net="pwm"]{opacity:1}
+#sch[data-focus="pwm"] [data-net="pwm"],#sch[data-focus="radio"] [data-net="radio"],
+#sch[data-focus="usb"] [data-net="usb"]{opacity:1}
 #sch[data-focus] .w{stroke-width:3.2}
 
 .esq-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;margin-top:18px}
@@ -618,7 +622,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
     <div class="reveal">
       <p class="eyebrow">05 · Esquemático</p>
       <h2>Esquemático eléctrico</h2>
-      <p class="lead">Así se conecta la aviónica: la <strong>Heltec WiFi LoRa 32 V3</strong> con el GPS, el GY-91 (acelerómetro + barómetro) y el servo del paracaídas. Todo se alimenta desde una <strong>LiPo 2S</strong> a través del LM2596; la Heltec recibe los 5.2 V por su conector USB-C mediante un cable USB modificado.</p>
+      <p class="lead">El sistema completo: en el cohete, la <strong>Heltec WiFi LoRa 32 V3</strong> con el GPS, el GY-91 (acelerómetro + barómetro), el servo del paracaídas y la <strong>cámara ESP32-CAM</strong>, todo alimentado desde una <strong>LiPo 2S</strong> a través del LM2596 (la Heltec recibe los 5.2 V por su USB-C con un cable USB modificado). En tierra, un <strong>ESP32</strong> recibe todo por radio <strong>ESP-NOW</strong> y lo entrega por USB al dashboard.</p>
     </div>
 
     <div class="esq-card reveal">
@@ -636,11 +640,13 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
         <button data-net="i2c"><i style="background:var(--c-i2c)"></i>I2C (SDA / SCL)</button>
         <button data-net="uart"><i style="background:var(--c-uart)"></i>UART GPS</button>
         <button data-net="pwm"><i style="background:var(--c-pwm)"></i>PWM servo</button>
+        <button data-net="radio"><i style="background:none;border-top:2px dashed var(--c-radio);height:0"></i>Radio ESP-NOW</button>
+        <button data-net="usb"><i style="background:var(--c-usb)"></i>USB</button>
       </div>
       </div>
       <p class="esq-hint">Pasa el cursor por la leyenda o por un cable para resaltar esa conexión. Un punto indica unión; dos cables que se cruzan sin punto NO están conectados.</p>
       <div class="esq-wrap">
-<svg id="sch" viewBox="0 0 1200 760" role="img" aria-label="Esquemático eléctrico de la aviónica">
+<svg id="sch" viewBox="0 0 1200 880" role="img" aria-label="Esquemático eléctrico del sistema completo: cohete y estación terrena">
   <defs>
     <pattern id="esqGridPat" width="20" height="20" patternUnits="userSpaceOnUse">
       <circle cx="1" cy="1" r="1" fill="#14294a"/>
@@ -653,7 +659,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
       <line x1="-2.5" y1="20" x2="2.5" y2="20" stroke="var(--c-gnd)" stroke-width="2.4" stroke-linecap="round"/>
     </g>
   </defs>
-  <rect width="1200" height="760" fill="url(#esqGridPat)"/>
+  <rect width="1200" height="880" fill="url(#esqGridPat)"/>
 
   <!-- ============ ALIMENTACIÓN ============ -->
   <!-- Batería -->
@@ -726,8 +732,8 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
     <rect class="pinmark" x="496" y="336" width="8" height="8" rx="2"/><text x="512" y="344" class="mute">GND</text>
     <rect class="pinmark" x="496" y="396" width="8" height="8" rx="2"/><text x="512" y="404">GPIO42 · SCL</text>
     <rect class="pinmark" x="496" y="426" width="8" height="8" rx="2"/><text x="512" y="434">GPIO41 · SDA</text>
-    <rect class="pinmark" x="496" y="596" width="8" height="8" rx="2"/><text x="512" y="604">GPIO6 · RX</text>
-    <rect class="pinmark" x="496" y="621" width="8" height="8" rx="2"/><text x="512" y="629">GPIO7 · TX</text>
+    <rect class="pinmark" x="496" y="596" width="8" height="8" rx="2"/><text x="512" y="604">GPIO7 · RX</text>
+    <rect class="pinmark" x="496" y="621" width="8" height="8" rx="2"/><text x="512" y="629">GPIO5 · TX</text>
   </g>
   <!-- Pines derecha -->
   <g class="pin">
@@ -781,8 +787,8 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
   <circle class="dot" data-net="gnd" cx="340" cy="356" r="4.5"/>
   <circle class="dot" data-net="gnd" cx="340" cy="376" r="4.5"/>
   <circle class="dot" data-net="gnd" cx="340" cy="580" r="4.5"/>
-  <use href="#esqTierra" x="590" y="700" data-net="gnd"/>
-  <text x="610" y="726" class="lbl" style="fill:var(--c-gnd)">GND común</text>
+  <use href="#esqTierra" x="450" y="700" data-net="gnd"/>
+  <text x="470" y="726" class="lbl" style="fill:var(--c-gnd)">GND común</text>
 
   <!-- ============ I2C ============ -->
   <path class="w" data-net="i2c" d="M250 400 H500"/>
@@ -818,16 +824,48 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
   <path class="w" data-net="gnd" d="M940 450 H840"/>
   <circle class="dot" data-net="gnd" cx="840" cy="450" r="4.5"/>
 
-  <!-- C1: condensador electrolítico 1000 µF en los bornes del servo -->
-  <path class="w" data-net="v5" d="M915 390 V413"/>
-  <path class="w" data-net="gnd" d="M915 427 V450"/>
-  <line x1="903" y1="413" x2="927" y2="413" stroke="var(--c-v5)" stroke-width="2.4" data-net="v5" class="w"/>
-  <path d="M903 429 Q915 421 927 429" fill="none" stroke="var(--c-gnd)" stroke-width="2.4" data-net="gnd" class="w"/>
-  <text x="898" y="410" text-anchor="end" class="pin" style="fill:var(--c-v5)">+</text>
-  <circle class="dot" data-net="v5" cx="915" cy="390" r="4"/>
-  <circle class="dot" data-net="gnd" cx="915" cy="450" r="4"/>
-  <text x="932" y="474" text-anchor="end" class="pin">C1</text>
-  <text x="932" y="487" text-anchor="end" class="st">1000 µF · 16 V</text>
+
+  <!-- ============ ESP32-CAM ============ -->
+  <rect class="box" x="950" y="540" width="210" height="140" rx="10"/>
+  <text x="966" y="566" class="ttl">ESP32-CAM</text>
+  <text x="966" y="584" class="st">AI-Thinker · OV2640</text>
+  <text x="966" y="600" class="st">graba en su microSD</text>
+  <text x="966" y="616" class="st">órdenes por ESP-NOW</text>
+  <g class="pin">
+    <rect class="pinmark" x="1156" y="581" width="8" height="8" rx="2"/><text x="1150" y="589" text-anchor="end">5V</text>
+    <rect class="pinmark" x="1156" y="621" width="8" height="8" rx="2"/><text x="1150" y="629" text-anchor="end" class="mute">GND</text>
+  </g>
+  <!-- 5.2 V hasta la cámara (rodea por la derecha, sin cruzar las líneas del servo) -->
+  <path class="w" data-net="v5" d="M880 70 H1185 V585 H1160"/>
+  <circle class="dot" data-net="v5" cx="880" cy="70" r="4.5"/>
+  <!-- GND de la cámara al GND común -->
+  <path class="w" data-net="gnd" d="M840 700 H1176 V625 H1160"/>
+  <circle class="dot" data-net="gnd" cx="840" cy="700" r="4.5"/>
+
+  <!-- ============ SEPARACIÓN COHETE / TIERRA ============ -->
+  <line x1="30" y1="748" x2="1170" y2="748" stroke="#24456b" stroke-width="1.5" stroke-dasharray="3 6"/>
+  <text x="40" y="742" class="st">▲ EN EL COHETE</text>
+  <text x="40" y="766" class="st">▼ EN TIERRA (sin cables con el cohete)</text>
+
+  <!-- ============ ESTACIÓN TERRENA ============ -->
+  <rect class="box" x="140" y="790" width="260" height="70" rx="10"/>
+  <text x="156" y="816" class="ttl">PC · DASHBOARD</text>
+  <text x="156" y="834" class="st">Chrome / Edge · Web Serial</text>
+  <text x="156" y="849" class="st">telemetría, cámara y video</text>
+  <rect class="box main" x="500" y="790" width="260" height="70" rx="10"/>
+  <text x="516" y="816" class="ttl">ESTACIÓN TERRENA</text>
+  <text x="516" y="834" class="st">ESP32 DevKit · receptor ESP-NOW</text>
+  <text x="516" y="849" class="st">reenvía datos y órdenes</text>
+  <path class="w" data-net="usb" d="M400 825 H500"/>
+  <text x="450" y="817" text-anchor="middle" class="lbl" style="fill:var(--c-usb)">USB</text>
+
+  <!-- ============ ENLACE DE RADIO ESP-NOW ============ -->
+  <path class="w" data-net="radio" d="M630 660 V790"/>
+  <path class="w" data-net="radio" d="M1055 680 V825 H760"/>
+  <text x="640" y="780" class="lbl" style="fill:var(--c-radio)">ESP-NOW · 2.4 GHz · canal 1</text>
+  <text x="1045" y="776" text-anchor="end" class="lbl" style="fill:var(--c-radio)">grabar / detener</text>
+  <text x="1045" y="790" text-anchor="end" class="lbl" style="fill:var(--c-radio)">y estado de la cámara</text>
+  <text x="640" y="728" class="lbl" style="fill:var(--c-radio)">telemetría ↓ · órdenes ↑</text>
 </svg>
       </div>
     </div>
@@ -847,8 +885,8 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
             <tr><td>LM2596</td><td>OUT−</td><td>GND común</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
             <tr><td>GPS</td><td>VCC</td><td>Heltec 3V3</td><td><span class="sw" style="background:var(--c-v33)"></span>3.3 V</td></tr>
             <tr><td>GPS</td><td>GND</td><td>GND</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
-            <tr><td>GPS</td><td>TX</td><td>Heltec GPIO6 (RX)</td><td><span class="sw" style="background:var(--c-uart)"></span>UART · datos NMEA</td></tr>
-            <tr><td>GPS</td><td>RX</td><td>Heltec GPIO7 (TX)</td><td><span class="sw" style="background:var(--c-uart)"></span>UART · configuración</td></tr>
+            <tr><td>GPS</td><td>TX</td><td>Heltec GPIO7 (RX)</td><td><span class="sw" style="background:var(--c-uart)"></span>UART · datos NMEA</td></tr>
+            <tr><td>GPS</td><td>RX</td><td>Heltec GPIO5 (TX)</td><td><span class="sw" style="background:var(--c-uart)"></span>UART · configuración</td></tr>
             <tr><td>GY-91</td><td>VIN, 3V3, CSB</td><td>Heltec 3V3</td><td><span class="sw" style="background:var(--c-v33)"></span>3.3 V · CSB alto = BMP280 en I2C</td></tr>
             <tr><td>GY-91</td><td>GND, SDO</td><td>GND</td><td><span class="sw" style="background:var(--c-gnd)"></span>SDO bajo = direcciones 0x68 / 0x76</td></tr>
             <tr><td>GY-91</td><td>SCL</td><td>Heltec GPIO42</td><td><span class="sw" style="background:var(--c-i2c)"></span>I2C reloj</td></tr>
@@ -857,7 +895,11 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
             <tr><td>Servo MG90S</td><td>V+</td><td>5.2 V (tras el interruptor)</td><td><span class="sw" style="background:var(--c-v5)"></span>potencia</td></tr>
             <tr><td>Servo MG90S</td><td>SIG</td><td>Heltec GPIO4</td><td><span class="sw" style="background:var(--c-pwm)"></span>PWM 50 Hz</td></tr>
             <tr><td>Servo MG90S</td><td>GND</td><td>GND común</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
-            <tr><td>C1 1000 µF</td><td>+ / −</td><td>Servo V+ / servo GND</td><td><span class="sw" style="background:var(--c-v5)"></span>absorbe el pico del servo</td></tr>
+            <tr><td>ESP32-CAM</td><td>5V</td><td>5.2 V (tras el interruptor)</td><td><span class="sw" style="background:var(--c-v5)"></span>alimentación de la cámara</td></tr>
+            <tr><td>ESP32-CAM</td><td>GND</td><td>GND común</td><td><span class="sw" style="background:var(--c-gnd)"></span>GND</td></tr>
+            <tr><td>ESP32-CAM</td><td>radio</td><td>Estación terrena (ESP-NOW)</td><td><span class="sw" style="background:var(--c-radio)"></span>grabar / detener y estado</td></tr>
+            <tr><td>Heltec V3</td><td>radio</td><td>Estación terrena (ESP-NOW)</td><td><span class="sw" style="background:var(--c-radio)"></span>telemetría y órdenes</td></tr>
+            <tr><td>Estación (ESP32)</td><td>USB</td><td>PC con el dashboard</td><td><span class="sw" style="background:var(--c-usb)"></span>datos por Web Serial</td></tr>
           </tbody>
           </table>
         </div>
@@ -869,7 +911,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
         <li class="bad"><b>Asegurar el conector USB-C</b> con silicona caliente, cinta o brida. En el despegue hay 10–20 g: si se suelta, se pierden la telemetría y el paracaídas.</li>
         <li class="warn"><b>Aislar los cables verde y blanco</b> (datos) del cable USB con cinta o termorretráctil para que no toquen nada.</li>
         <li class="warn"><b>Ajustar el LM2596 antes de conectar.</b> Medir 5.0–5.2 V con multímetro y sin carga; de fábrica puede salir a 7–8 V.</li>
-        <li class="warn"><b>C1 (1000 µF) tiene polaridad.</b> La pata larga (+) va a V+ del servo y la franja blanca (−) a GND. Si se invierte se calienta y puede reventar. Debe ser de 10 V o más (mejor 16 V) y ir lo más cerca posible de los cables del servo. Absorbe el pico de arranque del servo para que no afecte a la Heltec justo en el apogeo.</li>
+        <li><b>La cámara y la estación no llevan cables entre sí:</b> el ESP32-CAM recibe "Grabar" y "Detener" por ESP-NOW (canal 1, el mismo de la telemetría) y responde con su estado. Para programar la cámara se usa aparte el adaptador USB-TTL.</li>
         <li class="warn"><b>NCS del GY-91 sin conexión.</b> Funciona porque el módulo suele traer resistencia interna, pero conviene unirlo también a 3V3 para que el MPU9250 quede siempre en modo I2C.</li>
         <li><b>VIN y 3V3 del GY-91 ambos a 3V3:</b> no hay problema. Bastaría con VIN; el pin 3V3 es la salida del regulador del propio módulo.</li>
         <li><b>GND común:</b> todas las tierras (batería, LM2596, Heltec, sensores y servo) son el mismo nodo. Sin eso el servo no entiende la señal del GPIO4.</li>

@@ -26,10 +26,10 @@
  *   -------------------------+------------+--------------+------------------
  *   GY-91 SDA                |     41     |      21      |        8
  *   GY-91 SCL                |     42     |      22      |        9
- *   DHT11 DATA (pull-up 10k) |      5     |       4      |        4
+ *   DHT11 DATA (pull-up 10k) |      2     |       4      |        4   (solo con USAR_DHT = 1)
  *   Servo señal              |      4     |      13      |        5
- *   GPS: TX del NEO-M8N  ->  |   6 (RX)   |  16 (RX)     |   6 (RX)
- *   GPS: RX del NEO-M8N  <-  |   7 (TX)   |  17 (TX)     |   7 (TX)
+ *   GPS: TX del GPS      ->  |   7 (RX)   |  16 (RX)     |   6 (RX)
+ *   GPS: RX del GPS      <-  |   5 (TX)   |  17 (TX)     |   7 (TX)
  *   Botón de tara            |  0 (PRG)   |  0 (BOOT)    |   0 (BOOT)
  *   -------------------------+------------+--------------+------------------
  *  ALIMENTACIÓN:
@@ -49,6 +49,10 @@
 #include <DHT.h>
 #include <TinyGPS++.h>
 
+// 1 = hay un DHT11 conectado (temperatura y humedad). 0 = no se usa: la
+// temperatura sale del BMP280 y la humedad va como null.
+#define USAR_DHT 0
+
 // WIFI_LoRa_32_V3 lo define el core al elegir la placa Heltec V3
 #if defined(WIFI_LoRa_32_V3)
   #define ES_HELTEC 1
@@ -63,10 +67,10 @@
 #if ES_HELTEC
   #define PIN_SENSOR_SDA 41
   #define PIN_SENSOR_SCL 42
-  #define PIN_DHT        5
+  #define PIN_DHT        2    // Solo si USAR_DHT = 1
   #define PIN_SERVO      4
-  #define PIN_GPS_RX     6
-  #define PIN_GPS_TX     7
+  #define PIN_GPS_RX     7    // Al TX del GPS
+  #define PIN_GPS_TX     5    // Al RX del GPS
   // Internos de la Heltec V3
   #define PIN_OLED_SDA   17
   #define PIN_OLED_SCL   18
@@ -467,10 +471,18 @@ void leerSensores(uint32_t ahora) {
   // El DHT11 bloquea ~25 ms: no se lee durante el ascenso.
   if (estado != ASCENSO && ahora - tDht >= PERIODO_DHT_MS) {
     tDht = ahora;
+#if USAR_DHT
     float t = dht.readTemperature();
     float h = dht.readHumidity();
     if (!isnan(t)) temperatura = t;
     if (!isnan(h)) humedad = h;
+#else
+    // Sin DHT11: temperatura del BMP280 (mide su propio chip, referencia aproximada)
+    if (bmpOk) {
+      float t = bmp.readTemperature();
+      if (!isnan(t)) temperatura = t;
+    }
+#endif
   }
 
   actualizarMaquinaEstados(ahora);
@@ -743,7 +755,9 @@ void setup() {
   delay(250);
   mpuOk = mpuIniciar();
   bmpOk = bmpIniciar();
+#if USAR_DHT
   dht.begin();
+#endif
   Serial.printf("# MPU:%s BMP:%s\n", mpuOk ? "OK" : "FALLO", bmpOk ? "OK" : "FALLO");
 
   // 3. GPS: buffer grande para no perder frases NMEA

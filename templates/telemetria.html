@@ -142,6 +142,21 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
 .link-grid div{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .link-grid .lbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .link-grid b{font-family:var(--display);font-size:22px;font-weight:700}
+/* CÁMARA Y VIDEO */
+.pill.rec{color:var(--red);border-color:#6b2f38;background:rgba(255,107,122,.10);animation:blink 1.2s infinite}
+.cam-aviso{font-family:var(--mono);font-size:12px;color:var(--red);background:rgba(255,107,122,.08);border:1px solid #6b2f38;border-radius:8px;padding:6px 10px}
+.vp{margin-top:14px}
+.vp-pantalla{position:relative;background:#000;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:220px}
+#vpCanvas{display:block;max-width:100%;max-height:68vh}
+.vp-pantalla:fullscreen #vpCanvas{max-height:100vh}
+.vp-overlay{position:absolute;left:12px;top:10px;font-family:var(--mono);font-size:13px;color:#fff;background:rgba(5,11,20,.65);padding:5px 10px;border-radius:6px;pointer-events:none}
+.vp-controles{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px}
+.vp-controles input[type=range]{flex:1;min-width:160px;accent-color:var(--teal)}
+.vp-b{padding:8px 12px;font-size:14px}
+.vp-tiempo{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.vp-controles select,.vp-sync input{font-family:var(--mono);font-size:12px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.vp-sync{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.vp-sync input{width:90px}
 .tara-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px}
 .tara-txt{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .tara-txt.ok{color:var(--teal)}
@@ -192,10 +207,17 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
       <div class="head"><h3>Tiempo de vuelo</h3><span class="pill" id="pillVuelo">LISTO</span></div>
       <div class="crono" id="crono">00:00.0</div>
       <p>“Iniciar” pone el tiempo en 0 y registra el vuelo desde ese instante (borra la transmisión anterior). “Detener” congela el cronómetro y las gráficas.</p>
+      <p class="cam-aviso" id="camAviso" hidden>⚠ La cámara no está grabando</p>
       <div class="btnrow">
         <button class="btn btn-primary" id="btnVueloIni">Iniciar</button>
         <button class="btn btn-danger" id="btnVueloFin" disabled>Detener</button>
       </div>
+      <div class="btnrow">
+        <button class="btn btn-ghost" id="btnGuardarVuelo">Guardar vuelo</button>
+        <label class="btn btn-ghost" for="fileVuelo">Cargar vuelo</label>
+        <input type="file" id="fileVuelo" accept=".json">
+      </div>
+      <span class="hint" id="vueloHint"></span>
     </div>
     <div class="src">
       <div class="head"><h3>Modo prueba</h3><span class="pill" id="pillSim">LISTO</span></div>
@@ -231,6 +253,24 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
       <span class="tara-txt" id="servoTxt">Paracaídas: sin datos del cohete.</span>
     </div>
     <div class="link-log" id="lkLog">Sin líneas recibidas todavía.</div>
+  </div>
+
+  <!-- CÁMARA A BORDO -->
+  <div class="card" style="margin-bottom:22px">
+    <h3>Cámara a bordo <span class="pill" id="pillCam">SIN DATOS</span></h3>
+    <p class="note">El ESP32-CAM queda en espera al encender el cohete. “Grabar” crea una carpeta nueva en su microSD (cam_001, cam_002…); “Detener” la cierra.</p>
+    <div class="link-grid">
+      <div><span class="lbl">Carpeta</span><b id="camDir" style="font-size:16px">—</b></div>
+      <div><span class="lbl">Tiempo grabado</span><b id="camSeg">—</b></div>
+      <div><span class="lbl">Imágenes/s</span><b id="camFps">—</b></div>
+      <div><span class="lbl">Tamaño</span><b id="camMb">—</b></div>
+      <div><span class="lbl">microSD libre</span><b id="camLibre">—</b></div>
+    </div>
+    <div class="tara-row">
+      <button class="btn btn-primary" id="btnCamOn" disabled>● Grabar</button>
+      <button class="btn btn-danger" id="btnCamOff" disabled>■ Detener</button>
+      <span class="tara-txt" id="camTxt">Conecta el receptor para controlar la cámara.</span>
+    </div>
   </div>
 
   <!-- KPIs -->
@@ -286,6 +326,44 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
       <h3>Temperatura y presión</h3>
       <p class="note">Variables atmosféricas de la carga útil.</p>
       <div class="chart-box small"><canvas id="chAtm"></canvas></div>
+    </div>
+  </div>
+
+  <!-- VIDEO DEL VUELO -->
+  <div class="card" style="margin-top:14px">
+    <h3>Video del vuelo <span class="pill" id="pillVideo">SIN VIDEO</span></h3>
+    <p class="note">Elige la carpeta de la grabación (cam_001…) desde la microSD: se reproduce aquí mismo, sin convertir. Si el vuelo está cargado, el video va sincronizado con las gráficas (haz clic en una gráfica para saltar a ese instante).</p>
+    <div class="btnrow">
+      <label class="btn btn-primary" for="fileVideo">Cargar carpeta del video</label>
+      <input type="file" id="fileVideo" webkitdirectory multiple>
+      <label class="btn btn-ghost" for="fileVideoArch">o elegir los archivos</label>
+      <input type="file" id="fileVideoArch" multiple accept=".mjpeg,.mjpg,.csv,.txt">
+      <span class="hint" id="videoHint"></span>
+    </div>
+    <div class="vp" id="vp" hidden>
+      <div class="vp-pantalla" id="vpPantalla">
+        <canvas id="vpCanvas"></canvas>
+        <div class="vp-overlay" id="vpOverlay" hidden></div>
+      </div>
+      <div class="vp-controles">
+        <button class="btn btn-ghost vp-b" id="vpPrev" title="Imagen anterior (←)">⏮</button>
+        <button class="btn btn-primary vp-b" id="vpPlay" title="Reproducir / pausar (espacio)">▶</button>
+        <button class="btn btn-ghost vp-b" id="vpNext" title="Imagen siguiente (→)">⏭</button>
+        <input type="range" id="vpBarra" min="0" max="1000" value="0" step="1">
+        <span class="vp-tiempo" id="vpTiempo">0:00.00 / 0:00.00</span>
+        <select id="vpVel" title="Velocidad">
+          <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option>
+        </select>
+        <button class="btn btn-ghost vp-b" id="vpFoto" title="Guardar esta imagen">📷</button>
+        <button class="btn btn-ghost vp-b" id="vpFull" title="Pantalla completa">⛶</button>
+      </div>
+      <div class="vp-sync">
+        <span id="vpInfo"></span>
+        <label>Inicio del video en la telemetría: T =
+          <input type="number" id="vpOffset" step="0.1" placeholder="—"> s</label>
+        <span id="vpSyncTxt"></span>
+      </div>
     </div>
   </div>
 

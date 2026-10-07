@@ -12,8 +12,9 @@
  *    la OLED. En el ESP32 DevKit (sin pantalla) el LED cambia con cada paquete.
  *
  *  - Recibe órdenes de la página por Serial ("TARA <id>" = botón "Fijar
- *    cero", "SERVO <id>" = botón "Probar servo") y las reenvía al cohete
- *    por ESP-NOW.
+ *    cero", "SERVO <id>" = botón "Probar servo", "CAM_ON <id>" / "CAM_OFF
+ *    <id>" = grabar / detener la cámara) y las reenvía por ESP-NOW. El cohete
+ *    y la cámara escuchan el mismo canal; cada uno atiende solo las suyas.
  *
  *  Las líneas de diagnóstico propias empiezan con '#'.
  *  Librerías: ESP-NOW viene en el core. U8g2 (olikraus) solo para la Heltec.
@@ -130,7 +131,7 @@ bool espNowIniciar() {
 }
 
 // ============================================================================
-//  ÓRDENES DESDE LA PÁGINA  (línea "TARA <id>" o "SERVO <id>" por Serial)
+//  ÓRDENES DESDE LA PÁGINA  ("TARA", "SERVO", "CAM_ON", "CAM_OFF" + id)
 // ============================================================================
 // ESP-NOW broadcast no confirma la entrega, así que la orden se repite unas
 // veces; el cohete la atiende una sola vez gracias al id.
@@ -140,8 +141,10 @@ void atenderPagina(uint32_t ahora) {
     if (c == '\n' || c == '\r') {
       lineaCmd[lenCmd] = '\0';
       const char* nombre = nullptr;
-      if (strncmp(lineaCmd, "TARA", 4) == 0)       nombre = "TARA";
-      else if (strncmp(lineaCmd, "SERVO", 5) == 0) nombre = "SERVO";
+      if (strncmp(lineaCmd, "TARA", 4) == 0)         nombre = "TARA";
+      else if (strncmp(lineaCmd, "SERVO", 5) == 0)   nombre = "SERVO";
+      else if (strncmp(lineaCmd, "CAM_ON", 6) == 0)  nombre = "CAM_ON";   // Cámara: grabar
+      else if (strncmp(lineaCmd, "CAM_OFF", 7) == 0) nombre = "CAM_OFF";  // Cámara: detener
       if (nombre) {
         cmdNombre = nombre;
         cmdId = strtoul(lineaCmd + strlen(nombre), nullptr, 10);
