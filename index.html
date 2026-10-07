@@ -215,16 +215,6 @@ h2{
 .member .role{font-family:var(--mono);font-size:12px;color:var(--teal);letter-spacing:.06em;margin-top:4px}
 .member .sub{font-size:13px;color:var(--muted);margin-top:10px}
 
-/* placeholder de imagen */
-.ph{
-  border:1.5px dashed var(--line);border-radius:14px;background:rgba(13,27,46,.5);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-  color:var(--muted);font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;
-  text-align:center;padding:20px;min-height:220px;
-}
-.ph .big{font-size:30px;opacity:.6}
-.ph em{font-style:normal;color:#5d768f;font-size:11px}
-.org-ph{margin-top:44px}
 
 /* ---------- SUBSISTEMAS ---------- */
 .sys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
@@ -436,7 +426,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
     </p>
     <div class="hero-meta">
       <span>Propulsión: agua + aire comprimido</span>
-      <span>Enlace: LoRa 915 MHz</span>
+      <span>Enlace: ESP-NOW 2.4 GHz</span>
       <span>Recuperación: paracaídas + GPS</span>
     </div>
     <div class="hero-actions">
@@ -525,12 +515,7 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
       <div class="member reveal"><div class="avatar">NB</div><h3>Natalia Berdugo</h3><p class="role">SUBSISTEMA ESTRUCTURAL</p><p class="sub">Fuselaje, ojiva, aletas y ensamble del vehículo.</p></div>
       <div class="member reveal"><div class="avatar">JG</div><h3>José Granados</h3><p class="role">SUBSISTEMA ESTRUCTURAL</p><p class="sub">Cámara de presión, bahía de carga útil e integración mecánica.</p></div>
       <div class="member reveal"><div class="avatar">JB</div><h3>Jesús Bruges</h3><p class="role">SUBSISTEMA ELECTRÓNICO</p><p class="sub">Aviónica, sensores y lógica de despliegue del paracaídas.</p></div>
-      <div class="member reveal"><div class="avatar">RC</div><h3>Romeiro Cantillo</h3><p class="role">SUBSISTEMA ELECTRÓNICO</p><p class="sub">Enlace LoRa, estación terrena y registro de datos.</p></div>
-    </div>
-    <div class="ph org-ph reveal">
-      <span class="big">🗂️</span>
-      <span>[ PLACEHOLDER · ORGANIGRAMA DEL EQUIPO ]</span>
-      <em>Reemplaza este bloque por la imagen del organigrama</em>
+      <div class="member reveal"><div class="avatar">RC</div><h3>Romeiro Cantillo</h3><p class="role">SUBSISTEMA ELECTRÓNICO</p><p class="sub">Enlace de radio, estación terrena y registro de datos.</p></div>
     </div>
   </div>
 </section>
@@ -576,26 +561,23 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
       <div class="sys reveal">
         <span class="tag">ELECTRÓNICA</span>
         <h3>🧠 Aviónica de vuelo</h3>
-        <p>El cerebro es una Heltec WiFi LoRa 32 V3 (ESP32-S3 + radio LoRa SX1262) que lee, decide y transmite.</p>
+        <p>El cerebro es una Heltec WiFi LoRa 32 V3 (ESP32-S3) que lee, decide y transmite por ESP-NOW.</p>
         <ul>
           <li><b>GY-91</b>: presión, temperatura, altitud y aceleración</li>
-          <li><b>GPS NEO-M8N</b>: posición para la recuperación</li>
-          <li><b>microSD</b> como respaldo local · batería <b>LiPo 1S</b></li>
+          <li><b>GPS GY-NEO6MV2</b>: posición para la recuperación</li>
+          <li><b>ESP32-CAM</b>: video del vuelo en su microSD</li>
+          <li>Batería <b>LiPo 2S</b> con regulador <b>LM2596</b> a 5.2 V</li>
         </ul>
       </div>
       <div class="sys reveal">
         <span class="tag">ESTACIÓN TERRENA</span>
         <h3>📡 Recepción y dashboard</h3>
-        <p>Una segunda Heltec actúa como receptor LoRa conectado a una laptop, donde el dashboard grafica los datos en vivo.</p>
+        <p>Un ESP32 recibe todo por radio ESP-NOW y lo entrega por USB a una laptop, donde el dashboard grafica los datos en vivo.</p>
         <ul>
-          <li>Recepción continua a <b>915 MHz</b></li>
+          <li>Recepción continua por <b>ESP-NOW (2.4 GHz)</b></li>
           <li>Visualización en tiempo real en el <b>dashboard web</b></li>
+          <li>Control remoto: <b>fijar cero, probar servo y grabar video</b></li>
         </ul>
-      </div>
-      <div class="ph reveal">
-        <span class="big">🚀</span>
-        <span>[ PLACEHOLDER · MODELO CAD DEL COHETE ]</span>
-        <em>Reemplaza este bloque por el render del CAD</em>
       </div>
     </div>
   </div>
@@ -611,23 +593,23 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
     <div class="tele-grid">
       <div class="reveal">
         <p class="lead" style="margin-bottom:0">
-          El <strong>ESP32 es el cerebro</strong> de la misión: lee los sensores decenas de veces por segundo,
-          decide el momento exacto del despliegue del paracaídas y guarda cada dato en la microSD.
-          Al mismo tiempo, la radio <strong>LoRa a 915 MHz</strong> transmite lejos y sin cortes hasta la
-          estación terrena. El sistema se diseñó para <strong>seguir transmitiendo incluso con el cohete ya
-          en el suelo</strong>, funcionando como baliza para la recuperación.
+          La <strong>Heltec es el cerebro</strong> de la misión: lee los sensores 50 veces por segundo
+          y decide el momento exacto del despliegue del paracaídas. Al mismo tiempo, transmite la
+          telemetría por radio <strong>ESP-NOW</strong> hasta la estación terrena, sin router ni cables.
+          El sistema se diseñó para <strong>seguir transmitiendo incluso con el cohete ya en el suelo</strong>,
+          funcionando como baliza para la recuperación.
         </p>
         <ul class="flow">
-          <li><div class="ic">🛰️</div><div><b>A bordo — lectura</b><span>El GY-91 y el GPS entregan las 6 variables al ESP32.</span></div></li>
-          <li><div class="ic">💾</div><div><b>A bordo — respaldo</b><span>Cada paquete se escribe en la microSD: si el enlace falla, el dato no se pierde.</span></div></li>
-          <li><div class="ic">📡</div><div><b>Enlace — LoRa 915 MHz</b><span>Largo alcance y baja potencia: ideal para no perder el vuelo ni el aterrizaje.</span></div></li>
-          <li><div class="ic">💻</div><div><b>Tierra — dashboard</b><span>El receptor Heltec entrega los paquetes a la laptop y el dashboard los grafica en vivo.</span></div></li>
-          <li><div class="ic">✅</div><div><b>Verificación</b><span>Los datos de la microSD se cargan al dashboard y se comparan con la transmisión para confirmar la misión.</span></div></li>
+          <li><div class="ic">🛰️</div><div><b>A bordo — lectura</b><span>El GY-91 y el GPS entregan las 6 variables a la Heltec.</span></div></li>
+          <li><div class="ic">📡</div><div><b>Enlace — ESP-NOW 2.4 GHz</b><span>Un paquete cada 150 ms, del cohete a tierra; las órdenes (fijar cero, probar servo) viajan de vuelta por el mismo enlace.</span></div></li>
+          <li><div class="ic">🎥</div><div><b>A bordo — video</b><span>La ESP32-CAM graba el vuelo en su microSD; se inicia y detiene desde el dashboard.</span></div></li>
+          <li><div class="ic">💻</div><div><b>Tierra — dashboard</b><span>El ESP32 de la estación entrega los paquetes a la laptop y el dashboard los grafica en vivo.</span></div></li>
+          <li><div class="ic">✅</div><div><b>Después del vuelo</b><span>El vuelo se guarda en un archivo y el video se reproduce en el dashboard, sincronizado con las gráficas.</span></div></li>
         </ul>
       </div>
       <div class="reveal">
         <div class="tele-panel">
-          <div class="head"><span>ENLACE LORA · 915 MHz</span><span class="live">EN VIVO</span></div>
+          <div class="head"><span>ENLACE ESP-NOW · 2.4 GHz</span><span class="live">EN VIVO</span></div>
           <div class="fake-rows" id="fakeRows"></div>
           <div class="tele-cta">
             <a class="btn btn-primary" href="templates/telemetria.html">Abrir dashboard de telemetría ↗</a>
@@ -960,12 +942,16 @@ footer p{font-family:var(--mono);font-size:12px;color:var(--muted)}
           <tr><th>Componente</th><th>Cant.</th><th>Función</th><th>¿Por qué este?</th></tr>
         </thead>
         <tbody>
-          <tr><td>Heltec WiFi LoRa 32 V3</td><td class="qty">×2</td><td>Cerebro a bordo + receptor en tierra</td><td>ESP32-S3 potente con radio LoRa SX1262 de largo alcance integrada en una sola placa.</td></tr>
-          <tr><td>GY-91</td><td class="qty">×1</td><td>Presión, temperatura, altitud y aceleración</td><td>Cuatro medidas críticas en un solo módulo compacto y liviano.</td></tr>
-          <tr><td>GPS NEO-M8N</td><td class="qty">×1</td><td>Latitud y longitud</td><td>Da la posición en vuelo y sirve como baliza para recuperar el cohete.</td></tr>
+          <tr><td>Heltec WiFi LoRa 32 V3</td><td class="qty">×1</td><td>Computadora de vuelo a bordo</td><td>ESP32-S3 que lee los sensores, detecta el apogeo, acciona el paracaídas y transmite la telemetría por ESP-NOW.</td></tr>
+          <tr><td>ESP32 DevKit</td><td class="qty">×1</td><td>Receptor de la estación terrena</td><td>Recibe todo por ESP-NOW y lo entrega por USB al dashboard; también reenvía las órdenes al cohete y a la cámara.</td></tr>
+          <tr><td>GY-91</td><td class="qty">×1</td><td>Presión, temperatura, altitud y aceleración</td><td>Barómetro BMP280 y acelerómetro MPU9250 en un solo módulo compacto y liviano.</td></tr>
+          <tr><td>GPS GY-NEO6MV2</td><td class="qty">×1</td><td>Latitud y longitud</td><td>Da la posición en vuelo y sirve como baliza para recuperar el cohete.</td></tr>
           <tr><td>Servo MG90S</td><td class="qty">×1</td><td>Liberación del paracaídas</td><td>Torque suficiente con engranajes metálicos y peso mínimo; se acciona en el apogeo.</td></tr>
-          <tr><td>Batería LiPo 1S</td><td class="qty">×1</td><td>Alimentación de toda la aviónica</td><td>Alta densidad de energía y muy liviana: clave para no superar los 400 g.</td></tr>
-          <tr><td>Módulo microSD</td><td class="qty">×1</td><td>Registro de datos a bordo</td><td>Respaldo local de cada paquete: si el enlace falla, los datos sobreviven al vuelo.</td></tr>
+          <tr><td>ESP32-CAM (OV2640)</td><td class="qty">×1</td><td>Video del vuelo</td><td>Graba en su propia microSD; se inicia y se detiene desde el dashboard por ESP-NOW.</td></tr>
+          <tr><td>Tarjeta microSD</td><td class="qty">×1</td><td>Almacenamiento del video</td><td>De 32 GB o menos en FAT32: guarda cada grabación en una carpeta nueva.</td></tr>
+          <tr><td>Batería LiPo 2S (7.4 V)</td><td class="qty">×1</td><td>Alimentación de toda la aviónica</td><td>Alta densidad de energía y muy liviana: clave para no superar los 400 g.</td></tr>
+          <tr><td>Regulador LM2596</td><td class="qty">×1</td><td>Baja los 7.4 V a 5.2 V</td><td>Alimenta la Heltec, el servo y la cámara desde una sola batería.</td></tr>
+          <tr><td>Interruptor</td><td class="qty">×1</td><td>Encendido y apagado</td><td>Corta los 5.2 V de toda la aviónica sin desconectar la batería.</td></tr>
         </tbody>
       </table>
     </div>
