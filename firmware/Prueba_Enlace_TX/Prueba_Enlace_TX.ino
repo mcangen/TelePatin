@@ -172,6 +172,10 @@ void servoMover(int grados) {
 #endif
 }
 
+// Despliegue manual de emergencia: se acepta en cualquier estado y deja el
+// servo abierto ("Fijar cero" lo rearma, igual que tras un disparo).
+volatile bool     cmdDesplegarPendiente = false;
+volatile uint32_t cmdDesplegarId = 0;
 volatile bool     cmdServoPendiente = false;
 volatile uint32_t cmdServoId = 0;
 uint32_t ultimoIdServo = 0, tServoPrueba = 0, tEstadoServo = 0;
@@ -424,7 +428,7 @@ void desplegarParacaidas(const char* motivo) {
   motivoDespliegue = motivo;
   altDespliegue = altFilt;
   altMaxDespliegue = altMax;
-  msDespliegue = millis() - tSubida;
+  msDespliegue = (estadoApo == P_SUBIENDO) ? millis() - tSubida : 0;  // 0 = sin subida (manual en tierra)
   estadoApo = P_DISPARO;
   tEstadoServo = 0;  // Informar de inmediato a la página
   Serial.printf("# DISPARO (%s) alt=%.2f max=%.2f caida=%.2f m\n",
@@ -498,6 +502,9 @@ void alRecibir(const esp_now_recv_info_t* info, const uint8_t* datos, int len) {
   } else if (strncmp(txt + 4, "SERVO:", 6) == 0) {
     cmdServoId = strtoul(txt + 10, nullptr, 10);
     cmdServoPendiente = true;
+  } else if (strncmp(txt + 4, "DESPLEGAR:", 10) == 0) {
+    cmdDesplegarId = strtoul(txt + 14, nullptr, 10);
+    cmdDesplegarPendiente = true;
   }
 }
 
@@ -647,7 +654,7 @@ void atenderTaraRemota(uint32_t ahora) {
 void enviarEstadoServo() {
   char sAlt[16] = "null", sMs[16] = "null";
   if (paracaidas && !isnan(altDespliegue)) snprintf(sAlt, sizeof(sAlt), "%.2f", altDespliegue);
-  if (paracaidas) snprintf(sMs, sizeof(sMs), "%lu", (unsigned long)msDespliegue);
+  if (paracaidas && msDespliegue > 0) snprintf(sMs, sizeof(sMs), "%lu", (unsigned long)msDespliegue);
 
   char msg[160];
   int len = snprintf(msg, sizeof(msg),
@@ -660,8 +667,26 @@ void enviarEstadoServo() {
   if (radioOk) esp_now_send(DIRECCION_BROADCAST, (const uint8_t*)msg, len);
 }
 
-// La prueba de servo solo se acepta en ESPERA (no subiendo ni disparado)
+// La prueba de servo solo se acepta en ESPERA (no subiendo ni disparado).
+// El despliegue manual de emergencia se acepta SIEMPRE.
 void atenderServoRemoto() {
+  if (cmdDesplegarPendiente) {
+    cmdDesplegarPendiente = false;
+    uint32_t id = cmdDesplegarId;
+    if (id != ultimoIdServo) {
+      ultimoIdServo = id;
+      if (!paracaidas) {
+        desplegarParacaidas("MANUAL");
+        resultadoServo = 6;
+      } else {
+        servoMover(SERVO_ABIERTO);       // Ya estaba liberado: insistir por si se trabó
+        resultadoServo = 7;
+      }
+      Serial.printf("# DESPLIEGUE MANUAL id=%lu -> resultado %u\n", (unsigned long)id, resultadoServo);
+      tEstadoServo = 0;
+    }
+  }
+
   if (cmdServoPendiente) {
     cmdServoPendiente = false;
     uint32_t id = cmdServoId;

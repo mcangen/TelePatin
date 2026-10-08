@@ -376,7 +376,7 @@ function linkTrack(line){
   let o; try{ o=JSON.parse(line); }catch(e){ return; }
   // Estado de la tara: mensaje aparte, no es un paquete de telemetría
   if(o.tipo==='tara'){ T.est=o; T.estAt=now; return; }
-  if(o.tipo==='servo'){ V.est=o; V.estAt=now; return; }
+  if(o.tipo==='servo'){ V.est=o; V.estAt=now; E.est=o; return; }   // E: despliegue manual
   if(o.tipo==='cam'){ camTrack(o,now); return; }
 
   L.rx++; L.lastAt=now;
@@ -542,7 +542,7 @@ const SERVO_RES = {
   3:['bad','Rechazada: solo se prueba en ESPERA (no subiendo, en vuelo ni con el paracaídas liberado).'],
   5:['warn','Ya hay una prueba de servo en curso.'],
 };
-const MOTIVO_TXT = {APOGEO:'apogeo detectado', BARO:'respaldo barométrico', TIMEOUT:'respaldo por tiempo'};
+const MOTIVO_TXT = {APOGEO:'apogeo detectado', BARO:'respaldo barométrico', TIMEOUT:'respaldo por tiempo', MANUAL:'orden manual (emergencia)'};
 
 $('btnServo').addEventListener('click',async()=>{ await enviarOrden('SERVO',V); servoRender(); });
 
@@ -580,6 +580,39 @@ function servoRender(){
   }
 }
 setInterval(servoRender,500);
+
+/* ================= DESPLIEGUE MANUAL DE EMERGENCIA ================= */
+// Funciona en cualquier estado, también en pleno vuelo. Dos toques para evitar
+// un disparo accidental: el primero arma el botón 3 s, el segundo envía.
+// El cohete responde con el mismo mensaje {"tipo":"servo",...} (res 6 o 7).
+const E = {est:null, pendId:null, pendAt:0, aviso:null, avisoAt:0, armadoHasta:0};
+const DESPL_RES = {
+  6:['ok','✓ Paracaídas DESPLEGADO por orden manual.'],
+  7:['ok','✓ Ya estaba liberado: se volvió a ordenar la apertura del servo.'],
+};
+
+$('btnDesplegar').addEventListener('click',async()=>{
+  const now=performance.now();
+  if(now>E.armadoHasta){ E.armadoHasta=now+3000; desplegarRender(); return; }   // 1er toque: armar
+  E.armadoHasta=0;                                                              // 2do toque: enviar
+  await enviarOrden('DESPLEGAR',E);
+  desplegarRender();
+});
+
+function desplegarRender(){
+  const now=performance.now(), b=$('btnDesplegar'), el=$('desplegarTxt');
+  const armado=now<E.armadoHasta;
+  b.disabled=!S.serialActive || E.pendId!=null;
+  b.classList.toggle('armado',armado);
+  b.textContent=armado?'⚠ ¿Confirmar? Toca otra vez':'🪂 Desplegar paracaídas';
+
+  if(ordenPendiente(E,DESPL_RES,now)){ el.className='tara-txt warn'; el.textContent='Enviando orden de despliegue al cohete…'; return; }
+  if(armado){ el.className='tara-txt bad'; el.textContent=`Toca de nuevo en los próximos ${Math.ceil((E.armadoHasta-now)/1000)} s para DESPLEGAR.`; return; }
+  if(E.aviso && now-E.avisoAt<15000){ el.className='tara-txt '+E.aviso[0]; el.textContent=E.aviso[1]; return; }
+  el.className='tara-txt';
+  el.textContent='Emergencia: abre el paracaídas en cualquier momento, incluso en vuelo. Pide dos toques.';
+}
+setInterval(desplegarRender,250);
 
 /* ================= SIMULACIÓN ================= */
 function simPacket(t){

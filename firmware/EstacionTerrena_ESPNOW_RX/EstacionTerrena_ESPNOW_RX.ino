@@ -145,10 +145,12 @@ void atenderPagina(uint32_t ahora) {
       else if (strncmp(lineaCmd, "SERVO", 5) == 0)   nombre = "SERVO";
       else if (strncmp(lineaCmd, "CAM_ON", 6) == 0)  nombre = "CAM_ON";   // Cámara: grabar
       else if (strncmp(lineaCmd, "CAM_OFF", 7) == 0) nombre = "CAM_OFF";  // Cámara: detener
+      else if (strncmp(lineaCmd, "DESPLEGAR", 9) == 0) nombre = "DESPLEGAR"; // Paracaídas manual
       if (nombre) {
         cmdNombre = nombre;
         cmdId = strtoul(lineaCmd + strlen(nombre), nullptr, 10);
-        cmdRepeticiones = CMD_REPETICIONES;
+        // La emergencia se repite el doble: en vuelo es más fácil perder paquetes
+        cmdRepeticiones = (strcmp(nombre, "DESPLEGAR") == 0) ? 2 * CMD_REPETICIONES : CMD_REPETICIONES;
         tCmd = 0;
         Serial.printf("#CMD %s %lu enviando al cohete\n", cmdNombre, (unsigned long)cmdId);
       }

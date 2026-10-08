@@ -211,6 +211,11 @@ uint8_t  resultadoTara = 0;  // 0 ninguna, 1 OK, 2 en movimiento, 3 no está en 
 
 // Prueba de servo desde la página ("Probar servo"): abre, espera y vuelve a cerrar.
 const uint32_t SERVO_PRUEBA_MS = 2000;
+// Despliegue manual de emergencia ("Desplegar paracaídas" en la página):
+// se acepta en CUALQUIER estado, incluso en pleno vuelo, y deja el servo abierto.
+volatile bool     cmdDesplegarPendiente = false;
+volatile uint32_t cmdDesplegarId = 0;
+bool              huboLanzamiento = false;   // Para no informar tiempos "tras el lanzamiento" sin lanzamiento
 volatile bool     cmdServoPendiente = false;
 volatile uint32_t cmdServoId = 0;
 uint32_t ultimoIdServo = 0, tServoPrueba = 0, tEstadoServo = 0;
@@ -401,6 +406,7 @@ void actualizarMaquinaEstados(uint32_t ahora) {
       if (cuentaLanz >= MUESTRAS_CONFIRMACION) {
         estado = ASCENSO;
         tLanzamiento = ahora;
+        huboLanzamiento = true;
         altMax = max(0.0f, altFilt);
         cuentaApogeo = cuentaBaro = 0;
         Serial.println("# LANZAMIENTO detectado");
@@ -558,7 +564,7 @@ void enviarTelemetria(uint32_t ahora) {
 //  ESP-NOW
 // ============================================================================
 // Órdenes desde la estación (tarea WiFi: solo copiar y levantar la bandera)
-// Formato: "CMD:TARA:<id>" o "CMD:SERVO:<id>"
+// Formato: "CMD:TARA:<id>", "CMD:SERVO:<id>" o "CMD:DESPLEGAR:<id>"
 void alRecibirOrden(const esp_now_recv_info_t* info, const uint8_t* datos, int len) {
   if (len < 6 || len > 24 || memcmp(datos, "CMD:", 4) != 0) return;
   char txt[25];
@@ -570,6 +576,9 @@ void alRecibirOrden(const esp_now_recv_info_t* info, const uint8_t* datos, int l
   } else if (strncmp(txt + 4, "SERVO:", 6) == 0) {
     cmdServoId = strtoul(txt + 10, nullptr, 10);
     cmdServoPendiente = true;
+  } else if (strncmp(txt + 4, "DESPLEGAR:", 10) == 0) {
+    cmdDesplegarId = strtoul(txt + 14, nullptr, 10);
+    cmdDesplegarPendiente = true;
   }
 }
 
@@ -654,7 +663,7 @@ void atenderTaraRemota() {
 void enviarEstadoServo() {
   char sAlt[16] = "null", sMs[16] = "null";
   if (paracaidas && !isnan(altDespliegue)) snprintf(sAlt, sizeof(sAlt), "%.2f", altDespliegue);
-  if (paracaidas) snprintf(sMs, sizeof(sMs), "%lu", (unsigned long)msDespliegue);
+  if (paracaidas && huboLanzamiento) snprintf(sMs, sizeof(sMs), "%lu", (unsigned long)msDespliegue);
 
   char msg[160];
   int len = snprintf(msg, sizeof(msg),
@@ -669,7 +678,25 @@ void enviarEstadoServo() {
 
 // Seguridad: la prueba solo se acepta en ESPERA (nunca en vuelo ni con el
 // paracaídas ya liberado). El cierre se hace sin bloquear el programa.
+// El despliegue manual de emergencia, en cambio, se acepta SIEMPRE.
 void atenderServoRemoto() {
+  if (cmdDesplegarPendiente) {
+    cmdDesplegarPendiente = false;
+    uint32_t id = cmdDesplegarId;
+    if (id != ultimoIdServo) {   // La estación repite cada orden: se atiende una vez
+      ultimoIdServo = id;
+      if (!paracaidas) {
+        desplegarParacaidas("MANUAL");   // Abre y deja abierto; pasa a DESCENSO
+        resultadoServo = 6;
+      } else {
+        servoMover(SERVO_ABIERTO);       // Ya estaba liberado: insistir por si se trabó
+        resultadoServo = 7;
+      }
+      Serial.printf("# DESPLIEGUE MANUAL id=%lu -> resultado %u\n", (unsigned long)id, resultadoServo);
+      tEstadoServo = 0;
+    }
+  }
+
   if (cmdServoPendiente) {
     cmdServoPendiente = false;
     uint32_t id = cmdServoId;

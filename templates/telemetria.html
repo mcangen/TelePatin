@@ -143,6 +143,11 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
 .link-grid div{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .link-grid .lbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .link-grid b{font-family:var(--display);font-size:22px;font-weight:700}
+/* DESPLIEGUE DE EMERGENCIA */
+.btn-emerg{background:transparent;border:1.5px solid var(--red);color:var(--red)}
+.btn-emerg:hover:not(:disabled){background:rgba(255,107,122,.10)}
+.btn-emerg.armado{background:var(--red);color:#fff;animation:blink .8s infinite}
+
 /* CÁMARA Y VIDEO */
 .pill.rec{color:var(--red);border-color:#6b2f38;background:rgba(255,107,122,.10);animation:blink 1.2s infinite}
 .cam-aviso{font-family:var(--mono);font-size:12px;color:var(--red);background:rgba(255,107,122,.08);border:1px solid #6b2f38;border-radius:8px;padding:6px 10px}
@@ -274,6 +279,10 @@ td .tag.sd{color:var(--amber);border-color:#7a5a2a}
     <div class="tara-row">
       <button class="btn btn-ghost" id="btnServo" disabled>Probar servo</button>
       <span class="tara-txt" id="servoTxt">Paracaídas: sin datos del cohete.</span>
+    </div>
+    <div class="tara-row">
+      <button class="btn btn-emerg" id="btnDesplegar" disabled>🪂 Desplegar paracaídas</button>
+      <span class="tara-txt" id="desplegarTxt">Emergencia: abre el paracaídas en cualquier momento, incluso en vuelo. Pide dos toques.</span>
     </div>
     <div class="link-log" id="lkLog">Sin líneas recibidas todavía.</div>
   </div>
